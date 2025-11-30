@@ -1,0 +1,13 @@
+﻿import { NextRequest, NextResponse } from 'next/server'
+import { getPostBySlug } from '@/lib/posts'
+
+export async function GET(_req: NextRequest, context: { params: Promise<{ slug: string }>}){\n  const { slug } = await context.params;\n  // __PLACEHOLDER__{
+  const post = getPostBySlug(params.slug);
+  if(!post){
+    return NextResponse.json({ error: 'Not Found' }, { status: 404 });
+  }
+  // 返回不包含 content 的元信息
+  const { content, ...meta } = post;
+  return NextResponse.json({ post: meta });
+}
+

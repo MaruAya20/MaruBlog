@@ -1,0 +1,259 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// 用户角色，保持与现有代码中的 Role 一致
+enum Role {
+  ADMIN
+  AUTHOR
+  GUEST
+}
+
+/// 上传类型
+enum UploadKind {
+  AVATAR
+  WALLPAPER
+  OTHER
+}
+
+/// 上传资源状态
+enum UploadStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// 用户表，对应 JSON 中的 users[]
+model User {
+  id         Int       @id @default(autoincrement())
+  email      String?   @unique
+  name       String?
+  role       Role      @default(GUEST)
+  createdAt  DateTime  @default(now())
+  avatar     String?
+  signature  String?
+  xp         Int       @default(0)
+
+  /// JSON 里的 stats: { date, postsToday, xpToday, lastCommentAt }
+  statsDate      String?
+  postsToday     Int?      @default(0)
+  xpToday        Int?      @default(0)
+  lastCommentAt  DateTime?
+
+  // 关联
+  posts          Post[]
+  comments       Comment[]
+  prefs          UserPreference?
+  uploads        Upload[]
+  likes          Like[]
+  favorites      Favorite[]
+  commentBans    CommentBan[]  @relation("UserCommentBans")
+  userBans       UserBan[]
+  likedAwards    UserLikedAward[]
+  adminSessions  AdminSession[]
+  adminLogs      AdminLog[]
+  pageViews      PageView[]
+}
+
+/// 用户偏好，对应 JSON 的 prefs[]
+model UserPreference {
+  id        Int    @id @default(autoincrement())
+  user      User   @relation(fields: [userId], references: [id])
+  userId    Int    @unique
+  wallpaper String?
+  opacity   Float?
+  theme     String?
+  fontSize  String?
+}
+
+/// JSON 中 users.likedAward 数组，一行一条
+model UserLikedAward {
+  id     Int   @id @default(autoincrement())
+  user   User  @relation(fields: [userId], references: [id])
+  userId Int
+  title  String
+}
+
+/// 文章，对应 JSON 的 posts[]
+model Post {
+  id          Int       @id @default(autoincrement())
+  slug        String    @unique
+  title       String
+  excerpt     String?
+  content     String
+  /// 标签名称数组（保持与 JSON 中的 string[] 一致）
+  tags        String[]
+  publishedAt DateTime  @default(now())
+  status      String    @default("published") // draft / published
+  scheduledAt DateTime?
+
+  author      User      @relation(fields: [authorId], references: [id])
+  authorId    Int
+
+  comments    Comment[]
+  likes       Like[]
+  favorites   Favorite[]
+  pageViews   PageView[]
+}
+
+/// 评论，对应 JSON 的 comments[]
+model Comment {
+  id        Int      @id @default(autoincrement())
+  content   String
+  createdAt DateTime @default(now())
+
+  post      Post     @relation(fields: [postId], references: [id])
+  postId    Int
+
+  user      User?    @relation(fields: [userId], references: [id])
+  userId    Int?
+  guestName String?
+}
+
+/// 点赞，对应 JSON 的 likes[]
+model Like {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+
+  post      Post     @relation(fields: [postId], references: [id])
+  postId    Int
+
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+
+  @@unique([postId, userId])
+}
+
+/// 收藏，对应 JSON 的 favorites[]
+model Favorite {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+
+  post      Post     @relation(fields: [postId], references: [id])
+  postId    Int
+
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+
+  @@unique([postId, userId])
+}
+
+/// 上传记录，对应 JSON 的 uploads[]
+model Upload {
+  id           Int          @id @default(autoincrement())
+  user         User?        @relation(fields: [userId], references: [id])
+  userId       Int?
+  kind         UploadKind
+  filename     String
+  url          String       @unique
+  status       UploadStatus
+  createdAt    DateTime     @default(now())
+  originalName String?
+  mime         String
+  size         Int
+}
+
+/// 登录验证码，对应 JSON 的 codes[]
+model LoginCode {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  code      String
+  createdAt DateTime @default(now())
+}
+
+/// 访客评论频率限制，对应 JSON 的 rates[]
+model RateLimit {
+  id     Int    @id @default(autoincrement())
+  ip     String
+  date   String  // yyyy-MM-dd
+  count  Int     @default(0)
+  lastAt DateTime?
+
+  @@unique([ip, date])
+}
+
+/// 管理操作提升状态，对应 JSON 的 adminSessions[]
+model AdminSession {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  until     DateTime
+}
+
+/// 管理操作日志，对应 JSON 的 adminLogs[]
+model AdminLog {
+  id         Int      @id @default(autoincrement())
+  admin      User     @relation(fields: [adminId], references: [id])
+  adminId    Int
+  action     String
+  targetType String?
+  targetId   String?
+  detail     String?
+  createdAt  DateTime @default(now())
+  ip         String?
+  ua         String?
+}
+
+/// 评论封禁，对应 JSON 的 commentBans[]
+model CommentBan {
+  id        Int      @id @default(autoincrement())
+  user      User?    @relation("UserCommentBans", fields: [userId], references: [id])
+  userId    Int?
+  ip        String?
+  until     DateTime
+  reason    String?
+  createdAt DateTime @default(now())
+}
+
+/// 用户封禁，对应 JSON 的 userBans[]
+model UserBan {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  until     DateTime
+  reason    String?
+  createdAt DateTime @default(now())
+  permanent Boolean  @default(false)
+}
+
+/// 标签定义，对应 JSON 的 tagDefs[]
+model TagDef {
+  id      Int     @id @default(autoincrement())
+  name    String  @unique
+  color   String?
+  bg      String?
+  border  String?
+  hidden  Boolean @default(false)
+}
+
+/// 站点设置，对应 JSON 的 settings（仅一行）
+model SiteSettings {
+  id                Int     @id @default(1)
+  title             String
+  subtitle          String?
+  seoDescription    String?
+  announcement      String?
+  allowGuestComment Boolean @default(true)
+  allowRegistration Boolean @default(true)
+}
+
+/// PV/UV 统计，对应 JSON 的 pageViews[]
+model PageView {
+  id      Int      @id @default(autoincrement())
+  route   String
+  slug    String?
+  at      DateTime @default(now())
+
+  user    User?    @relation(fields: [userId], references: [id])
+  userId  Int?
+
+  post    Post?    @relation(fields: [postId], references: [id])
+  postId  Int?
+
+  ip      String?
+}

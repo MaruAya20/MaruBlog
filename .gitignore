@@ -1,0 +1,21 @@
+# 依赖和构建产物
+node_modules/
+.next/
+out/
+build/
+coverage/
+
+# TypeScript / Next.js 中间文件
+*.tsbuildinfo
+next-env.d.ts
+
+# 环境变量和本地配置
+.env*
+.env.local
+.env.development.local
+.env.production.local
+
+# 本地数据和上传文件（不要进 Git）
+data/
+web/data/
+public/uploads/

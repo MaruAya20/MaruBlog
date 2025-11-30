@@ -1,0 +1,19 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { Store } from '@/lib/store'
+import { getSession } from '@/lib/auth'
+
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }){
+  const { slug } = await params;
+  const sess = await getSession();
+  const count = Store.countLikes(slug);
+  const liked = sess ? Store.hasLiked(slug, sess.uid) : false;
+  return NextResponse.json({ count, liked })
+}
+
+export async function POST(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }){
+  const { slug } = await params;
+  const sess = await getSession();
+  if(!sess) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const result = Store.toggleLike(slug, sess.uid)
+  return NextResponse.json(result)
+}

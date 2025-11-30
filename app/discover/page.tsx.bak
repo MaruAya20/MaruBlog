@@ -1,0 +1,35 @@
+﻿import Container from "../components/Container";
+
+const posts = [
+  { id: 1, title: '用更少的代码做更多的事', excerpt: '记录一些高效开发的小技巧……', tag: '科技', date: '2025-01-18' },
+  { id: 2, title: '周末徒步记', excerpt: '郊外的小路、微风和云……', tag: '生活', date: '2025-01-10' },
+  { id: 3, title: '为什么写博客', excerpt: '写是最好的思考方式。', tag: '随笔', date: '2024-12-29' }
+];
+
+export default function Discover(){
+  return (
+    <Container>
+      <section className="section">
+        <h1 className="sr-only">发现帖子</h1>
+        <div className="subnav">
+          <a href="#" className="chip" onClick={(e)=>{e.preventDefault(); alert('分区栏待定，稍后上线~');}}>科技</a>
+          <a href="#" className="chip" onClick={(e)=>{e.preventDefault(); alert('分区栏待定，稍后上线~');}}>生活</a>
+          <a href="#" className="chip" onClick={(e)=>{e.preventDefault(); alert('分区栏待定，稍后上线~');}}>随笔</a>
+        </div>
+        <div className="grid posts">
+          {posts.map(p => (
+            <article key={p.id} className="card post">
+              <div className="title">{p.title}</div>
+              <div className="excerpt">{p.excerpt}</div>
+              <div className="meta">
+                <span className="badge tag"># {p.tag}</span>
+                <span className="badge date">{p.date}</span>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+    </Container>
+  );
+}
+

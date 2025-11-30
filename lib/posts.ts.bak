@@ -1,0 +1,66 @@
+﻿import fs from 'node:fs';
+import path from 'node:path';
+import matter from 'gray-matter';
+
+export type PostMeta = {
+  slug: string;
+  title: string;
+  date: string; // ISO
+  excerpt?: string;
+  tags?: string[];
+  cover?: string;
+};
+
+export type Post = PostMeta & { content: string };
+
+const postsDir = path.join(process.cwd(), 'web', 'content', 'posts');
+
+export function getPostSlugs(): string[] {
+  if (!fs.existsSync(postsDir)) return [];
+  return fs
+    .readdirSync(postsDir)
+    .filter((f) => f.endsWith('.md') || f.endsWith('.mdx'))
+    .map((f) => f.replace(/\.(md|mdx)$/i, ''));
+}
+
+export function getPostBySlug(slug: string): Post | null {
+  const file = ['.mdx', '.md']
+    .map((ext) => path.join(postsDir, `${slug}${ext}`))
+    .find((p) => fs.existsSync(p));
+  if (!file) return null;
+  const raw = fs.readFileSync(file, 'utf-8');
+  const { data, content } = matter(raw);
+  const meta: PostMeta = {
+    slug,
+    title: String(data.title || slug),
+    date: String(data.date || new Date().toISOString().slice(0, 10)),
+    excerpt: data.excerpt ? String(data.excerpt) : undefined,
+    tags: Array.isArray(data.tags) ? data.tags.map(String) : undefined,
+    cover: data.cover ? String(data.cover) : undefined,
+  };
+  return { ...meta, content };
+}
+
+export function getAllPosts(): PostMeta[] {
+  const slugs = getPostSlugs();
+  const list: PostMeta[] = [];
+  for (const s of slugs) {
+    const p = getPostBySlug(s);
+    if (p) list.push({ slug: p.slug, title: p.title, date: p.date, excerpt: p.excerpt, tags: p.tags, cover: p.cover });
+  }
+  return list.sort((a, b) => (a.date > b.date ? -1 : 1));
+}
+
+export function getPosts(opts?: { tag?: string; page?: number; pageSize?: number }) {
+  const tag = opts?.tag;
+  const page = Math.max(1, opts?.page || 1);
+  const pageSize = Math.max(1, Math.min(50, opts?.pageSize || 5));
+  let list = getAllPosts();
+  if (tag) list = list.filter((p) => (p.tags || []).includes(tag));
+  const total = list.length;
+  const start = (page - 1) * pageSize;
+  const end = start + pageSize;
+  const items = list.slice(start, end);
+  return { items, total, page, pageSize, hasMore: end < total };
+}
+

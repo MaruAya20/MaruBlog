@@ -1,0 +1,630 @@
+"use client";
+import Container from "../components/Container";
+import { useEffect, useRef, useState } from "react";
+import MarkdownToolbar from "../components/MarkdownToolbar";
+import { useToast } from "../components/ToastProvider";
+
+type ImageItem = { url: string; name: string; snippet: string };
+type AudioItem = { url: string; name: string; snippet: string };
+
+export default function NewPost() {
+  const [me, setMe] = useState<any>(null);
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [preset, setPreset] = useState<string[]>([]);
+  const [excerpt, setExcerpt] = useState("");
+  const [msg, setMsg] = useState("");
+  const editorRef = useRef<HTMLTextAreaElement>(null);
+  const [images, setImages] = useState<ImageItem[]>([]);
+  const [audios, setAudios] = useState<AudioItem[]>([]);
+  const [scheduledAt, setScheduledAt] = useState("");
+  const { showToast } = useToast();
+  // 是否需要保留本次会话中的上传（例如已经暂存，或已成功发布/保存为草稿）
+  const keepUploadsRef = useRef(false);
+
+  const getTempKey = (userId?: number) =>
+    `marublog:new-temp:${userId ?? "guest"}`;
+
+  useEffect(() => {
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((d) => setMe(d.user))
+      .catch(() => {});
+    fetch("/api/tags")
+      .then((r) => r.json())
+      .then((d) => setPreset(d.tags || []))
+      .catch(() => {});
+  }, []);
+
+  // 读取本地暂存内容（每个用户一个暂存位）
+  useEffect(() => {
+    if (!me) return;
+    try {
+      const raw = localStorage.getItem(getTempKey(me.id));
+      if (!raw) return;
+      const data = JSON.parse(raw) as any;
+      if (data.title) setTitle(String(data.title));
+      if (data.content) setContent(String(data.content));
+      if (Array.isArray(data.tags)) setTags(data.tags as string[]);
+      if (data.excerpt) setExcerpt(String(data.excerpt));
+      if (typeof data.scheduledAt === "string")
+        setScheduledAt(data.scheduledAt);
+      if (Array.isArray(data.images))
+        setImages(data.images as ImageItem[]);
+      if (Array.isArray(data.audios))
+        setAudios(data.audios as AudioItem[]);
+      keepUploadsRef.current = true;
+      // 防止在开发模式下 React 严格模式导致重复提示：全局标记只提示一次
+      if (typeof window !== "undefined") {
+        const g = window as any;
+        if (!g.__marublogNewRestored) {
+          g.__marublogNewRestored = true;
+          showToast("已恢复上次未完成的文章", "info");
+        }
+      }
+    } catch {
+      // 忽略暂存解析错误
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me]);
+
+  // 离开新建页面时，清理本次会话中未使用的上传资源（仅在未暂存/未发布的情况下）
+  useEffect(() => {
+    return () => {
+      if (keepUploadsRef.current) return;
+      const urls = [
+        ...images.map((i) => i.url),
+        ...audios.map((a) => a.url),
+      ];
+      if (!urls.length) return;
+      try {
+        const payload = JSON.stringify({ urls });
+        if (typeof navigator !== "undefined" && navigator.sendBeacon) {
+          const blob = new Blob([payload], {
+            type: "application/json",
+          });
+          navigator.sendBeacon("/api/upload/cleanup", blob);
+        } else {
+          // 退路：使用 keepalive fetch，尽量在关闭前发出请求
+          fetch("/api/upload/cleanup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            keepalive: true as any,
+            body: payload,
+          }).catch(() => {});
+        }
+      } catch {
+        // 忽略清理失败
+      }
+    };
+  }, [images, audios]);
+
+  function clearTemp() {
+    if (!me) return;
+    try {
+      localStorage.removeItem(getTempKey(me.id));
+    } catch {
+      // ignore
+    }
+  }
+
+  function saveTemp() {
+    if (!me) {
+      return;
+    }
+    if (
+      !title &&
+      !content &&
+      !excerpt &&
+      !tags.length &&
+      !images.length &&
+      !audios.length &&
+      !scheduledAt
+    ) {
+      // 没有内容就不写入暂存
+      return;
+    }
+    try {
+      const key = getTempKey(me.id);
+      const payload = {
+        title,
+        content,
+        tags,
+        excerpt,
+        scheduledAt,
+        images,
+        audios,
+      };
+      localStorage.setItem(key, JSON.stringify(payload));
+      // 一旦写入暂存，就视为需要保留本次上传
+      keepUploadsRef.current = true;
+    } catch {
+      // 静默失败即可，避免打扰用户
+    }
+  }
+
+  // 自动暂存：表单内容发生变化时后台静默写入本地暂存（每用户一份）
+  useEffect(() => {
+    if (!me) return;
+    saveTemp();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    me,
+    title,
+    content,
+    excerpt,
+    scheduledAt,
+    tags,
+    images,
+    audios,
+  ]);
+
+  async function submit() {
+    if (!me) {
+      setMsg("请先登录");
+      return;
+    }
+    const res = await fetch("/api/posts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ authorId: me.id, title, content, excerpt, tags }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      clearTemp();
+      keepUploadsRef.current = true;
+      location.href = `/post/${encodeURIComponent(data.post.slug)}`;
+    } else {
+      setMsg(data.error || "发布失败");
+    }
+  }
+
+  async function saveDraft() {
+    if (!me) {
+      setMsg("请先登录");
+      return;
+    }
+    setMsg("正在保存草稿...");
+    const res = await fetch("/api/posts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        authorId: me.id,
+        title,
+        content,
+        excerpt,
+        tags,
+        status: "draft",
+      }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      clearTemp();
+      keepUploadsRef.current = true;
+      location.href = "/drafts";
+    } else {
+      setMsg(data.error || "保存草稿失败");
+    }
+  }
+
+  async function scheduleDraft() {
+    if (!me) {
+      setMsg("请先登录");
+      return;
+    }
+    if (!scheduledAt) {
+      setMsg("请选择定时发布时间");
+      return;
+    }
+    const t = Date.parse(String(scheduledAt));
+    if (!Number.isFinite(t) || t <= Date.now()) {
+      setMsg("定时发布时间必须在当前时间之后");
+      return;
+    }
+    setMsg("正在创建定时草稿...");
+    const iso = new Date(t).toISOString();
+    const res = await fetch("/api/posts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        authorId: me.id,
+        title,
+        content,
+        excerpt,
+        tags,
+        status: "draft",
+        scheduledAt: iso,
+      }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      clearTemp();
+      keepUploadsRef.current = true;
+      location.href = "/drafts";
+    } else {
+      setMsg(data.error || "定时发布失败");
+    }
+  }
+
+  async function handleImageFiles(files: FileList | null) {
+    if (!files) return;
+    if (images.length >= 3) {
+      showToast("最多只能添加 3 张图片", "info");
+      return;
+    }
+    const remaining = Math.max(0, 3 - images.length);
+    const picked = Array.from(files).slice(0, remaining);
+    for (const f of picked) {
+      if (f.size > 10 * 1024 * 1024) {
+        showToast(`${f.name} 超过 10MB，已跳过`, "error");
+        continue;
+      }
+      const fd = new FormData();
+      fd.append("file", f);
+      try {
+        const r = await fetch("/api/upload?kind=other", {
+          method: "POST",
+          body: fd,
+        });
+        const d = await r.json();
+        if (!r.ok || !d?.upload?.url) {
+          showToast(d?.error || "上传失败", "error");
+          continue;
+        }
+        const url = d.upload.url as string;
+        const snippet = `\n![图片](${url})\n`;
+        setContent((prev) => prev + snippet);
+        setImages((prev) =>
+          [...prev, { url, name: f.name, snippet }].slice(0, 3),
+        );
+      } catch {
+        showToast("上传失败", "error");
+      }
+    }
+  }
+
+  async function handleAudioFile(file: File | null) {
+    if (!file) return;
+    if (audios.length >= 2) {
+      showToast("最多只能添加 2 个音频", "info");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showToast(`${file.name} 超过 10MB，已跳过`, "error");
+      return;
+    }
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const r = await fetch("/api/upload?kind=other", {
+        method: "POST",
+        body: fd,
+      });
+      const d = await r.json();
+      if (!r.ok || !d?.upload?.url) {
+        showToast(d?.error || "上传失败", "error");
+        return;
+      }
+      const url = d.upload.url as string;
+      const safeName = file.name.replace(/[`\\]/g, "");
+      const snippet = `\n<div className="card" data-audio>\n  <div>🎵 ${safeName}</div>\n  <audio controls src="${url}" preload="none" style={{width:'100%'}} />\n</div>\n`;
+      setContent((prev) => prev + snippet);
+      setAudios((prev) =>
+        prev.length >= 2 ? prev : [...prev, { url, name: file.name, snippet }],
+      );
+    } catch {
+      showToast("上传失败", "error");
+    }
+  }
+
+  async function removeImage(item: ImageItem) {
+    setImages((prev) => prev.filter((x) => x.url !== item.url));
+    setContent((prev) => prev.replace(item.snippet, ""));
+    try {
+      await fetch("/api/upload/cleanup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ urls: [item.url] }),
+      });
+    } catch {
+      // ignore cleanup failures
+    }
+  }
+
+  async function removeAudio(item: AudioItem) {
+    setAudios((prev) => prev.filter((x) => x.url !== item.url));
+    setContent((prev) => prev.replace(item.snippet, ""));
+    try {
+      await fetch("/api/upload/cleanup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ urls: [item.url] }),
+      });
+    } catch {
+      // ignore cleanup failures
+    }
+  }
+
+  return (
+    <Container>
+      <section className="section" style={{ display: "grid", gap: 12 }}>
+        <div className="card" style={{ display: "grid", gap: 8 }}>
+          <div style={{ fontWeight: 600 }}>新建文章</div>
+          <input
+            placeholder="标题"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            style={{
+              padding: "8px 10px",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              background: "transparent",
+              color: "var(--text)",
+            }}
+          />
+          <div style={{ display: "grid", gap: 6 }}>
+            <div style={{ color: "var(--muted)" }}>标签</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {preset.map((t) => (
+                <button
+                  type="button"
+                  key={t}
+                  className="nav-link"
+                  aria-pressed={tags.includes(t)}
+                  onClick={() =>
+                    setTags((prev) =>
+                      prev.includes(t)
+                        ? prev.filter((x) => x !== t)
+                        : [...prev, t],
+                    )
+                  }
+                  style={{ cursor: "pointer" }}
+                >
+                  {tags.includes(t) ? "✓ " : ""}
+                  {t}
+                </button>
+              ))}
+              <button
+                type="button"
+                className="nav-link"
+                onClick={() => {
+                  const t = prompt("输入自定义标签");
+                  if (!t) return;
+                  const v = t.trim();
+                  if (!v) return;
+                  if (!tags.includes(v)) setTags((prev) => [...prev, v]);
+                }}
+                style={{ cursor: "pointer" }}
+              >
+                +自定义
+              </button>
+            </div>
+          </div>
+          <textarea
+            placeholder="摘要"
+            value={excerpt}
+            onChange={(e) => setExcerpt(e.target.value)}
+            rows={3}
+            style={{
+              padding: "8px 10px",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              background: "transparent",
+              color: "var(--text)",
+            }}
+          />
+          <label style={{ display: "grid", gap: 6 }}>
+            <span style={{ color: "var(--muted)" }}>定时发布时间（可选）</span>
+            <input
+              type="datetime-local"
+              value={scheduledAt}
+              onChange={(e) => setScheduledAt(e.target.value)}
+              style={{
+                padding: "8px 10px",
+                border: "1px solid var(--border)",
+                borderRadius: 8,
+                background: "transparent",
+                color: "var(--text)",
+              }}
+            />
+          </label>
+
+          <MarkdownToolbar
+            targetRef={editorRef}
+            value={content}
+            onChange={setContent}
+          />
+
+          {/* 图片上传 */}
+          <div className="card" style={{ display: "grid", gap: 8 }}>
+            <div style={{ fontWeight: 600 }}>
+              图片（最多 3 张，单张 ≤ 10MB）
+            </div>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={async (e) => {
+                const input = e.currentTarget;
+                await handleImageFiles(input.files);
+                input.value = "";
+              }}
+            />
+            {!!images.length && (
+              <div className="hint">已添加图片：{images.length}/3</div>
+            )}
+          </div>
+          {!!images.length && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {images.map((img) => (
+                <div
+                  key={img.url}
+                  style={{ position: "relative", display: "inline-block" }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={img.url}
+                    alt={img.name}
+                    style={{
+                      width: 88,
+                      height: 88,
+                      objectFit: "cover",
+                      borderRadius: 8,
+                      border: "1px solid var(--border)",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(img)}
+                    style={{
+                      position: "absolute",
+                      top: 2,
+                      right: 2,
+                      width: 20,
+                      height: 20,
+                      borderRadius: "50%",
+                      border: "none",
+                      background: "rgba(0,0,0,.6)",
+                      color: "#fff",
+                      cursor: "pointer",
+                      fontSize: 12,
+                      lineHeight: "20px",
+                      textAlign: "center",
+                    }}
+                    aria-label="移除图片"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 音频上传 */}
+          <div className="card" style={{ display: "grid", gap: 8 }}>
+            <div style={{ fontWeight: 600 }}>
+              音频（最多 2 个，单个 ≤ 10MB）
+            </div>
+            <input
+              type="file"
+              accept="audio/*"
+              onChange={async (e) => {
+                const input = e.currentTarget;
+                const f = input.files?.[0] || null;
+                await handleAudioFile(f);
+                input.value = "";
+              }}
+            />
+            {!!audios.length && (
+              <div className="hint">
+                已添加音频：
+                {audios.map((a) => (
+                  <span key={a.url} style={{ marginRight: 8 }}>
+                    {a.name}
+                    <button
+                      type="button"
+                      onClick={() => removeAudio(a)}
+                      style={{
+                        marginLeft: 4,
+                        border: "none",
+                        background: "transparent",
+                        color: "var(--muted)",
+                        cursor: "pointer",
+                      }}
+                      aria-label="移除音频"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <textarea
+            ref={editorRef}
+            placeholder="正文（支持 Markdown/MDX）"
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            rows={10}
+            style={{
+              padding: "8px 10px",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              background: "transparent",
+              color: "var(--text)",
+            }}
+          />
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              className="nav-link"
+              onClick={submit}
+              style={{ cursor: "pointer" }}
+            >
+              发布
+            </button>
+            <button
+              className="nav-link"
+              type="button"
+              onClick={saveDraft}
+              style={{ cursor: "pointer" }}
+            >
+              保存草稿
+            </button>
+            <button
+              className="nav-link"
+              type="button"
+              onClick={scheduleDraft}
+              style={{ cursor: "pointer" }}
+            >
+              定时发布
+            </button>
+            <button
+              className="nav-link"
+              type="button"
+              onClick={async () => {
+                const ok = window.confirm(
+                  "确定要清空当前新建文章以及暂存内容吗？此操作不可恢复。",
+                );
+                if (!ok) return;
+                // 先收集需要清理的资源 URL
+                const urls = [
+                  ...images.map((i) => i.url),
+                  ...audios.map((a) => a.url),
+                ];
+                // 清空本地状态和暂存
+                setTitle("");
+                setContent("");
+                setExcerpt("");
+                setTags([]);
+                setScheduledAt("");
+                setImages([]);
+                setAudios([]);
+                clearTemp();
+                keepUploadsRef.current = false;
+                if (urls.length) {
+                  try {
+                    await fetch("/api/upload/cleanup", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ urls }),
+                    });
+                  } catch {
+                    // ignore
+                  }
+                }
+                showToast("已清空当前新建文章", "success");
+              }}
+              style={{ cursor: "pointer" }}
+            >
+              清空
+            </button>
+            {msg && <span className="hint">{msg}</span>}
+          </div>
+        </div>
+      </section>
+    </Container>
+  );
+}
