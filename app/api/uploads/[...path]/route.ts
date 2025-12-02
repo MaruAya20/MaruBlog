@@ -38,8 +38,8 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> },
 ) {
-  const { path } = await params;
-  const rel = (path || []).join("/");
+  const { path: segs } = await params;
+  const rel = (segs || []).join("/");
   // 简单防止目录遍历
   if (!rel || rel.includes("..")) {
     return new NextResponse("Not found", { status: 404 });
