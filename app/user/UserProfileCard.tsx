@@ -19,7 +19,6 @@ export default function UserProfileCard() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState("");
-  const [avatar, setAvatar] = useState("");
   const [signature, setSignature] = useState("");
   const [msg, setMsg] = useState("");
   const [cropOpen, setCropOpen] = useState(false);
@@ -97,7 +96,7 @@ export default function UserProfileCard() {
           <div className="avatar-circle" aria-label="用户头像">
             {me.avatar ? (
               <img
-                src={me.avatar}
+                src={me.avatar?.startsWith("/uploads/") ? `/api${me.avatar}` : me.avatar}
                 alt="头像"
                 style={{
                   width: "100%",
@@ -345,4 +344,3 @@ export default function UserProfileCard() {
     </>
   );
 }
-

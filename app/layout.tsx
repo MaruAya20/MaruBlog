@@ -44,7 +44,7 @@ export default async function RootLayout({
       where: { userId: sess.uid },
     });
     if (pref) {
-      wpUrl = pref.wallpaper || "";
+      wpUrl = (pref.wallpaper as string | null) || "";
       if (typeof pref.opacity === "number") {
         wpOpacity = String(Math.min(1, Math.max(0, pref.opacity)));
       }
@@ -59,6 +59,11 @@ export default async function RootLayout({
     wpOpacity = "";
   }
 
+  // 兼容旧数据：如果 URL 以 /uploads/ 开头，统一转成 /api/uploads/ 前缀
+  if (wpUrl && wpUrl.startsWith("/uploads/")) {
+    wpUrl = "/api" + wpUrl;
+  }
+
   const style: React.CSSProperties & Record<string, string> = {};
   if (wpUrl) style["--wallpaper-url"] = `url("${wpUrl}")`;
   if (wpOpacity) style["--wallpaper-opacity"] = String(wpOpacity);
@@ -71,7 +76,7 @@ export default async function RootLayout({
           {settings.announcement && (
             <div
               style={{
-                width:"50%",
+                width: "50%",
                 margin: "0 auto",
                 padding: "20px 12px 0",
               }}
@@ -96,3 +101,4 @@ export default async function RootLayout({
     </html>
   );
 }
+

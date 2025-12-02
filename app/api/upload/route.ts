@@ -89,7 +89,8 @@ export async function POST(req: NextRequest) {
     fs.mkdirSync(UPLOAD_DIR, { recursive: true });
     fs.writeFileSync(path.join(UPLOAD_DIR, filename), buffer);
 
-    const url = `/uploads/${filename}`;
+    // 统一通过 /api/uploads 读取，避免依赖 Next.js 对 public/ 的静态缓存
+    const url = `/api/uploads/${filename}`;
 
     // 写入 Prisma.Upload，保持与后台 /admin/uploads 统一的记录
     const uploadRow = await prisma.upload.create({
