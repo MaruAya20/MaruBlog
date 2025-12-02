@@ -57,6 +57,7 @@ export async function GET(
     return new NextResponse("Not found", { status: 404 });
   }
 
+  
   try {
     const data = await fs.promises.readFile(filePath);
     const contentType = getContentType(filePath);
