@@ -19,6 +19,7 @@ export default function UserProfileCard() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState("");
+  const [avatar, setAvatar] = useState("");
   const [signature, setSignature] = useState("");
   const [msg, setMsg] = useState("");
   const [cropOpen, setCropOpen] = useState(false);
