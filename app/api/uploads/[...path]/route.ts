@@ -36,9 +36,10 @@ function getContentType(filePath: string): string {
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { path: string[] } },
+  { params }: { params: Promise<{ path: string[] }> },
 ) {
-  const rel = (params.path || []).join("/");
+  const { path } = await params;
+  const rel = (path || []).join("/");
   // 简单防止目录遍历
   if (!rel || rel.includes("..")) {
     return new NextResponse("Not found", { status: 404 });
@@ -70,4 +71,3 @@ export async function GET(
     return new NextResponse("Internal error", { status: 500 });
   }
 }
-
