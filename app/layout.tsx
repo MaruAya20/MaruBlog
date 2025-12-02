@@ -9,6 +9,9 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getSiteSettingsDb } from "@/lib/siteSettingsDb";
 
+// 布局依赖用户会话 / DB 中的壁纸偏好，必须每次请求都重新计算，避免被静态缓存
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteSettingsDb();
   const title = settings.title || "MaruBlog";

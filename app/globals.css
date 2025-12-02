@@ -92,6 +92,52 @@ body::after{
 
 .article { line-height: 1.8; color: var(--text); }
 .article h1,.article h2,.article h3{ margin: 1.2em 0 .6em; }
+.article h1{
+  font-size: 1.6rem;
+  font-weight: 700;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: .3em;
+}
+.article h2{
+  font-size: 1.4rem;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: .25em;
+}
+.article h3{
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+.article p{
+  margin: .6em 0;
+}
+.article ul,
+.article ol{
+  margin: .6em 0 .6em 1.5em;
+  padding-left: 1.5em;
+}
+.article li{
+  margin: .2em 0;
+}
+.article a{
+  color: var(--brand);
+  text-decoration: underline;
+}
+.article a:hover{
+  color: #3fc7d3;
+}
+.article strong{
+  font-weight: 600;
+}
+.article em{
+  font-style: italic;
+}
+.article blockquote{
+  margin: .8em 0;
+  padding: .4em .8em;
+  border-left: 3px solid var(--border);
+  color: var(--muted);
+}
 .article pre{ padding:12px; border-radius: 8px; background:#0c1220; overflow:auto; }
 .article code{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 .article img{
