@@ -3,12 +3,14 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import fs from "node:fs";
 import path from "node:path";
+import sharp from "sharp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Always write into the app's public/uploads directory
+// Base directory for uploaded files
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
+const THUMB_DIR = path.join(UPLOAD_DIR, "thumbs");
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,7 +33,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 只读取一次表单，避免重复消费 body
+    // Read form-data once
     const form = await req.formData();
     const file = form.get("file");
     if (!(file instanceof File)) {
@@ -41,8 +43,25 @@ export async function POST(req: NextRequest) {
     const mime = file.type || "";
     const name = file.name || "";
     const lower = name.toLowerCase();
-    const audioExts = [".mp3", ".m4a", ".aac", ".wav", ".ogg", ".flac", ".opus", ".weba"];
-    const imageExts = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg"];
+    const audioExts = [
+      ".mp3",
+      ".m4a",
+      ".aac",
+      ".wav",
+      ".ogg",
+      ".flac",
+      ".opus",
+      ".weba",
+    ];
+    const imageExts = [
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".gif",
+      ".webp",
+      ".bmp",
+      ".svg",
+    ];
 
     let isImage = mime.startsWith("image/");
     let isAudio = mime.startsWith("audio/");
@@ -70,7 +89,7 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // 音频大小限制：≤ 10MB
+    // Limit audio size to 10MB
     if (isAudio && buffer.length > 10 * 1024 * 1024) {
       return NextResponse.json(
         {
@@ -81,36 +100,82 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const extFromName = file.name.split(".").pop() || "";
-    const ext = "." + (extFromName || (isAudio ? "mp3" : "png"));
-    const filename =
-      `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
-
     fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-    fs.writeFileSync(path.join(UPLOAD_DIR, filename), buffer);
 
-    // 统一通过 /api/uploads 读取，避免依赖 Next.js 对 public/ 的静态缓存
+    let filename: string;
+    let storedSize = buffer.length;
+    let storedMime = mime;
+    let thumbFilename: string | null = null;
+
+    if (isImage) {
+      // For images: generate compressed main image + thumbnail
+      fs.mkdirSync(THUMB_DIR, { recursive: true });
+      const baseName = `${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2)}`;
+
+      filename = `${baseName}.jpg`;
+      thumbFilename = `${baseName}.thumb.jpg`;
+
+      // Main image: max 1920x1920, JPEG quality ~80
+      const mainBuffer = await sharp(buffer, { failOnError: false })
+        .resize({
+          width: 1920,
+          height: 1920,
+          fit: "inside",
+          withoutEnlargement: true,
+        })
+        .jpeg({ quality: 80 })
+        .toBuffer();
+
+      // Thumbnail: 400x400 square, JPEG quality ~75
+      const thumbBuffer = await sharp(buffer, { failOnError: false })
+        .resize(400, 400, { fit: "cover" })
+        .jpeg({ quality: 75 })
+        .toBuffer();
+
+      fs.writeFileSync(path.join(UPLOAD_DIR, filename), mainBuffer);
+      fs.writeFileSync(path.join(THUMB_DIR, thumbFilename), thumbBuffer);
+
+      storedSize = mainBuffer.length;
+      storedMime = "image/jpeg";
+    } else {
+      // Non-image (audio): write as-is
+      const extFromName = file.name.split(".").pop() || "";
+      const ext = "." + (extFromName || "bin");
+      filename = `${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2)}${ext}`;
+      fs.writeFileSync(path.join(UPLOAD_DIR, filename), buffer);
+    }
+
+    // Read via /api/uploads to avoid relying on Next static public/ caching
     const url = `/api/uploads/${filename}`;
+    const thumbUrl =
+      thumbFilename != null
+        ? `/api/uploads/thumbs/${thumbFilename}`
+        : null;
 
-    // 写入 Prisma.Upload，保持与后台 /admin/uploads 统一的记录
+    // Persist Prisma.Upload, consistent with /admin/uploads
     const uploadRow = await prisma.upload.create({
       data: {
         userId: sess.uid,
-        kind: kind === "avatar"
-          ? "AVATAR"
-          : kind === "wallpaper"
-          ? "WALLPAPER"
-          : "OTHER",
+        kind:
+          kind === "avatar"
+            ? "AVATAR"
+            : kind === "wallpaper"
+            ? "WALLPAPER"
+            : "OTHER",
         filename,
         url,
         originalName: file.name || null,
-        mime,
-        size: buffer.length,
+        mime: storedMime,
+        size: storedSize,
         status: "PENDING",
       },
     });
 
-    // 保持与旧 Store.addUpload 返回结构兼容
+    // Response compatible with old Store.addUpload, plus thumbUrl hint
     const rec = {
       id: uploadRow.id,
       userId: uploadRow.userId ?? undefined,
@@ -122,6 +187,7 @@ export async function POST(req: NextRequest) {
       size: uploadRow.size,
       status: uploadRow.status.toLowerCase(),
       createdAt: uploadRow.createdAt.toISOString(),
+      thumbUrl,
     };
 
     return NextResponse.json({ ok: true, upload: rec });
@@ -132,3 +198,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+

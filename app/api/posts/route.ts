@@ -140,7 +140,7 @@ export async function GET(req: NextRequest) {
       String(p.content || "").matchAll(/!\[[^\]]*]\(([^)]+)\)/g),
     )
       .slice(0, 3)
-      .map((m) => m[1]);
+      .map((m) => m[1] as string);
     const effectiveAt = p.scheduledAt ?? p.publishedAt;
 
     const tagsArray = (p.tags || []) as string[];
@@ -154,6 +154,20 @@ export async function GET(req: NextRequest) {
       tagStyles[name] =
         tagStyleMap[name] || getTagStyle(name);
     }
+
+    const thumbs = imgs.map((url) => {
+      // 仅对本站 /api/uploads/ 生成缩略图 URL，其它外链保持原样
+      if (url.startsWith("/api/uploads/")) {
+        const rest = url.slice("/api/uploads/".length); // e.g. "abc.jpg"
+        if (rest.startsWith("thumbs/")) return url;
+        const lastDot = rest.lastIndexOf(".");
+        if (lastDot === -1) return url;
+        const base = rest.slice(0, lastDot); // "abc"
+        const ext = rest.slice(lastDot); // ".jpg"
+        return `/api/uploads/thumbs/${base}.thumb${ext}`;
+      }
+      return url;
+    });
 
     return {
       slug: p.slug,
@@ -169,6 +183,7 @@ export async function GET(req: NextRequest) {
         : undefined,
       authorId: p.authorId,
       previewImages: imgs,
+      previewThumbs: thumbs,
       likes: (p as any)._count?.likes ?? 0,
       favorites: (p as any)._count?.favorites ?? 0,
       tagStyles,
@@ -338,4 +353,3 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ post });
 }
-

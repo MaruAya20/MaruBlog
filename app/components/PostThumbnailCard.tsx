@@ -175,8 +175,16 @@ export default function PostThumbnailCard({
       >
         {p.excerpt}
       </div>
-      {Array.isArray((p as any).previewImages) &&
-        (p as any).previewImages.length > 0 && (
+      {(() => {
+        const thumbs = (p as any).previewThumbs;
+        const imgs = (p as any).previewImages;
+        const list: string[] | null = Array.isArray(thumbs)
+          ? thumbs
+          : Array.isArray(imgs)
+          ? imgs
+          : null;
+        if (!list || list.length === 0) return null;
+        return (
           <ArticleImageBinder
             className={showMissingImageFallback ? "article" : ""}
           >
@@ -187,13 +195,14 @@ export default function PostThumbnailCard({
                 flexWrap: "wrap",
               }}
             >
-              {(p as any).previewImages.slice(0, 3).map((src: string) =>
+              {list.slice(0, 3).map((src: string) =>
                 showMissingImageFallback ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     key={src}
                     src={src}
                     alt="预览"
+                    loading="lazy"
                     style={{
                       width: 88,
                       height: 88,
@@ -208,7 +217,8 @@ export default function PostThumbnailCard({
               )}
             </div>
           </ArticleImageBinder>
-        )}
+        );
+      })()}
       <div className="meta">
         <span className="badge date">
           {formatYMDHM(p.publishedAt || p.date)}
