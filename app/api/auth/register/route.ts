@@ -56,8 +56,11 @@ export async function POST(req: NextRequest) {
   }
 
   // 校验验证码（10 分钟有效期）
+  const emailRaw = String(email).trim();
+  const normalizedEmail = emailRaw.toLowerCase();
+
   const entry = await prisma.loginCode.findUnique({
-    where: { email },
+    where: { email: normalizedEmail },
   });
   const age = entry
     ? Date.now() - entry.createdAt.getTime()
@@ -75,7 +78,7 @@ export async function POST(req: NextRequest) {
 
   // 检查是否已有同邮箱用户
   const exists = await prisma.user.findUnique({
-    where: { email },
+    where: { email: normalizedEmail },
   });
   if (exists) {
     return NextResponse.json(
@@ -89,13 +92,13 @@ export async function POST(req: NextRequest) {
 
   const role =
     process.env.ADMIN_EMAIL &&
-    email === process.env.ADMIN_EMAIL
+    normalizedEmail === process.env.ADMIN_EMAIL.toLowerCase()
       ? "ADMIN"
       : "AUTHOR";
 
   const u = await prisma.user.create({
     data: {
-      email,
+      email: normalizedEmail,
       name,
       role,
     },
@@ -103,7 +106,7 @@ export async function POST(req: NextRequest) {
 
   await prisma.loginCode
     .delete({
-      where: { email },
+      where: { email: normalizedEmail },
     })
     .catch(() => {
       // 忽略删除验证码失败，避免影响主流程
@@ -126,4 +129,3 @@ export async function POST(req: NextRequest) {
     },
   });
 }
-

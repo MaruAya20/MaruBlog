@@ -7,6 +7,19 @@ import { useToast } from "../../components/ToastProvider";
 type ImageItem = { url: string; name: string; snippet: string };
 type AudioItem = { url: string; name: string; snippet: string };
 
+function toLocalDateTimeInputValue(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const mm = pad(d.getMonth() + 1);
+  const dd = pad(d.getDate());
+  const hh = pad(d.getHours());
+  const mi = pad(d.getMinutes());
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+}
+
 export default function EditDraft({
   params,
 }: {
@@ -56,7 +69,8 @@ export default function EditDraft({
       setContent(p.content || "");
       setExcerpt(p.excerpt || "");
       setTags(p.tags || []);
-      setScheduledAt(p.scheduledAt || "");
+      // 将 ISO 时间转换为 datetime-local 可用的本地字符串
+      setScheduledAt(toLocalDateTimeInputValue(p.scheduledAt));
 
       // 解析正文中已有的图片与音频，填充卡片列表
       const c = String(p.content || "");
@@ -495,4 +509,3 @@ export default function EditDraft({
     </Container>
   );
 }
-

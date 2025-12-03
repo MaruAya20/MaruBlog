@@ -21,9 +21,10 @@ export async function POST(req: NextRequest) {
   }
 
   const trimmedEmail = email.trim();
+  const normalizedEmail = trimmedEmail.toLowerCase();
 
   // 1) 基本格式校验
-  if (!isValidEmailFormat(trimmedEmail)) {
+  if (!isValidEmailFormat(normalizedEmail)) {
     return NextResponse.json(
       {
         error: "invalid_email_format",
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 2) 域名可用性校验：检查 MX / A 记录，避免明显不可用的邮箱域名
-  const domainOk = await isEmailDomainReachable(trimmedEmail);
+  const domainOk = await isEmailDomainReachable(normalizedEmail);
   if (!domainOk) {
     return NextResponse.json(
       {
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
 
   try {
     user = await prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
       select: { id: true, email: true, role: true },
     });
   } catch {
@@ -129,7 +130,7 @@ export async function POST(req: NextRequest) {
   // 发送验证码频率限制：1 分钟内仅允许发送一次
   try {
     const entry = await prisma.loginCode.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
     });
     if (entry) {
       const ageMs = Date.now() - entry.createdAt.getTime();
@@ -151,12 +152,13 @@ export async function POST(req: NextRequest) {
     );
 
     await prisma.loginCode.upsert({
-      where: { email },
+      where: { email: normalizedEmail },
       update: { code, createdAt: new Date() },
       create: { email, code },
     });
 
-    await sendLoginCodeEmail(email, code, kind);
+    // 实际发送邮件时不区分大小写，这里使用规范化后的地址
+    await sendLoginCodeEmail(normalizedEmail, code, kind);
 
     return NextResponse.json({ ok: true });
   } catch (err) {

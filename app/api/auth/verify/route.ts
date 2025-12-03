@@ -18,8 +18,11 @@ export async function POST(req: NextRequest) {
   }
 
   // 校验验证码（10 分钟有效期）
+  const emailRaw = String(email).trim();
+  const normalizedEmail = emailRaw.toLowerCase();
+
   const entry = await prisma.loginCode.findUnique({
-    where: { email },
+    where: { email: normalizedEmail },
   });
   const age = entry
     ? Date.now() - entry.createdAt.getTime()
@@ -36,7 +39,7 @@ export async function POST(req: NextRequest) {
   }
 
   const u = await prisma.user.findUnique({
-    where: { email },
+    where: { email: normalizedEmail },
   });
   if (!u) {
     return NextResponse.json(
@@ -81,7 +84,7 @@ export async function POST(req: NextRequest) {
 
   await prisma.loginCode
     .delete({
-      where: { email },
+      where: { email: normalizedEmail },
     })
     .catch(() => {
       // 忽略删除验证码失败，避免影响登录
@@ -104,4 +107,3 @@ export async function POST(req: NextRequest) {
     },
   });
 }
-
