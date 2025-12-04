@@ -176,14 +176,18 @@ export default function PostThumbnailCard({
         {p.excerpt}
       </div>
       {(() => {
-        const thumbs = (p as any).previewThumbs;
-        const imgs = (p as any).previewImages;
-        const list: string[] | null = Array.isArray(thumbs)
-          ? thumbs
-          : Array.isArray(imgs)
-          ? imgs
-          : null;
-        if (!list || list.length === 0) return null;
+        const imgs: string[] = Array.isArray((p as any).previewImages)
+          ? (p as any).previewImages
+          : [];
+        const thumbs: string[] = Array.isArray((p as any).previewThumbs)
+          ? (p as any).previewThumbs
+          : imgs;
+        if (!imgs.length && !thumbs.length) return null;
+        const pairs = imgs.slice(0, 3).map((full: string, idx: number) => ({
+          full,
+          thumb: thumbs[idx] || full,
+        }));
+        if (!pairs.length) return null;
         return (
           <ArticleImageBinder
             className={showMissingImageFallback ? "article" : ""}
@@ -195,12 +199,13 @@ export default function PostThumbnailCard({
                 flexWrap: "wrap",
               }}
             >
-              {list.slice(0, 3).map((src: string) =>
+              {pairs.map(({ full, thumb }) =>
                 showMissingImageFallback ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    key={src}
-                    src={src}
+                    key={thumb}
+                    src={thumb}
+                    data-full-src={full}
                     alt="预览"
                     loading="lazy"
                     style={{
@@ -212,7 +217,7 @@ export default function PostThumbnailCard({
                     }}
                   />
                 ) : (
-                  <PreviewImage key={src} src={src} />
+                  <PreviewImage key={thumb} src={thumb} />
                 ),
               )}
             </div>

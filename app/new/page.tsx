@@ -13,6 +13,7 @@ export default function NewPost() {
   const [content, setContent] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [preset, setPreset] = useState<string[]>([]);
+  const [customTags, setCustomTags] = useState<string[]>([]);
   const [excerpt, setExcerpt] = useState("");
   const [msg, setMsg] = useState("");
   const editorRef = useRef<HTMLTextAreaElement>(null);

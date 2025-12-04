@@ -15,7 +15,10 @@ export default function ArticleImageBinder({ children, className = "article" }: 
       if(!t) return;
       if(t.tagName === 'IMG'){
         e.preventDefault(); e.stopPropagation();
-        const s = (t as HTMLImageElement).src; if(s){ setSrc(s); setOpen(true); }
+        const img = t as HTMLImageElement;
+        // 如果存在 data-full-src，则优先使用完整大图 URL，否则退回到当前 src
+        const s = img.getAttribute('data-full-src') || img.src;
+        if(s){ setSrc(s); setOpen(true); }
       }
     };
     const onError = (e: Event) => {
