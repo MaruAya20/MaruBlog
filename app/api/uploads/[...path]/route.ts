@@ -53,11 +53,6 @@ export async function GET(
     if (!stat.isFile()) {
       return new NextResponse("Not found", { status: 404 });
     }
-  } catch {
-    return new NextResponse("Not found", { status: 404 });
-  }
-
-  try {
     const data = await fs.promises.readFile(filePath);
     const contentType = getContentType(filePath);
     return new NextResponse(data, {
@@ -68,6 +63,8 @@ export async function GET(
       },
     });
   } catch {
-    return new NextResponse("Internal error", { status: 500 });
+    // 不再回退到原图，缩略图缺失时直接 404
+    return new NextResponse("Not found", { status: 404 });
   }
 }
+
