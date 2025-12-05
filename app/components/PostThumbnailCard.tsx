@@ -6,14 +6,16 @@ import ArticleImageBinder from "@/app/components/ArticleImageBinder";
 import { getLevelBadge } from "@/lib/userLevel";
 import { getTagStyle } from "@/lib/tagStyle";
 
-function PreviewImage({ src }: { src: string }) {
+// 小卡片里的预览图：使用缩略图 URL 作为 src，同时把完整图 URL 放到 data-full-src，方便预览组件读取
+function PreviewImage({ thumb, full }: { thumb: string; full?: string }) {
   const [visible, setVisible] = useState(true);
   if (!visible) return null;
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      key={src}
-      src={src}
+      key={thumb}
+      src={thumb}
+      data-full-src={full || thumb}
       alt="预览"
       onError={() => setVisible(false)}
       style={{
@@ -217,7 +219,7 @@ export default function PostThumbnailCard({
                     }}
                   />
                 ) : (
-                  <PreviewImage key={thumb} src={thumb} />
+                  <PreviewImage key={thumb} thumb={thumb} full={full} />
                 ),
               )}
             </div>
