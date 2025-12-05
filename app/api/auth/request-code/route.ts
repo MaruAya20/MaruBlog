@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
     await prisma.loginCode.upsert({
       where: { email: normalizedEmail },
       update: { code, createdAt: new Date() },
-      create: { email, code },
+      create: { email: normalizedEmail, code },
     });
 
     // 实际发送邮件时不区分大小写，这里使用规范化后的地址
