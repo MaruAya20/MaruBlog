@@ -1,4 +1,5 @@
 "use client";
+
 import Container from "../components/Container";
 import { useEffect, useRef, useState } from "react";
 import MarkdownToolbar from "../components/MarkdownToolbar";
@@ -21,12 +22,13 @@ export default function NewPost() {
   const [audios, setAudios] = useState<AudioItem[]>([]);
   const [scheduledAt, setScheduledAt] = useState("");
   const { showToast } = useToast();
-  // 是否需要保留本次会话中的上传（例如已经暂存，或已成功发布/保存为草稿）
+  // 是否需要保留本次会话中的上传（例如已经暂存，或已成功保存为草稿）
   const keepUploadsRef = useRef(false);
 
   const getTempKey = (userId?: number) =>
     `marublog:new-temp:${userId ?? "guest"}`;
 
+  // 初始化当前用户与预设标签
   useEffect(() => {
     fetch("/api/me")
       .then((r) => r.json())
@@ -70,7 +72,7 @@ export default function NewPost() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me]);
 
-  // 离开新建页面时，清理本次会话中未使用的上传资源（仅在未暂存/未发布的情况下）
+  // 离开新建页面时，清理本次会话中未使用的上传资源（仅在未暂存 / 未发布的情况下）
   useEffect(() => {
     return () => {
       if (keepUploadsRef.current) return;
@@ -112,9 +114,7 @@ export default function NewPost() {
   }
 
   function saveTemp() {
-    if (!me) {
-      return;
-    }
+    if (!me) return;
     if (
       !title &&
       !content &&
@@ -162,6 +162,18 @@ export default function NewPost() {
     audios,
   ]);
 
+  // 根据当前已选标签推导出自定义标签列表，用于在标签行尾部显示并提供删除按钮
+  useEffect(() => {
+    const presetSet = new Set(preset);
+    const custom: string[] = [];
+    for (const t of tags) {
+      const name = (t || "").trim();
+      if (!name) continue;
+      if (!presetSet.has(name)) custom.push(name);
+    }
+    setCustomTags(custom);
+  }, [preset, tags]);
+
   async function submit() {
     if (!me) {
       setMsg("请先登录");
@@ -170,7 +182,13 @@ export default function NewPost() {
     const res = await fetch("/api/posts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ authorId: me.id, title, content, excerpt, tags }),
+      body: JSON.stringify({
+        authorId: me.id,
+        title,
+        content,
+        excerpt,
+        tags,
+      }),
     });
     const data = await res.json();
     if (res.ok) {
@@ -365,28 +383,85 @@ export default function NewPost() {
               color: "var(--text)",
             }}
           />
+
+          {/* 标签选择 + 自定义标签 */}
           <div style={{ display: "grid", gap: 6 }}>
             <div style={{ color: "var(--muted)" }}>标签</div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {preset.map((t) => (
-                <button
-                  type="button"
-                  key={t}
-                  className="nav-link"
-                  aria-pressed={tags.includes(t)}
-                  onClick={() =>
-                    setTags((prev) =>
-                      prev.includes(t)
-                        ? prev.filter((x) => x !== t)
-                        : [...prev, t],
-                    )
-                  }
-                  style={{ cursor: "pointer" }}
-                >
-                  {tags.includes(t) ? "✓ " : ""}
-                  {t}
-                </button>
-              ))}
+              {/* 预设标签 */}
+              {preset.map((t) => {
+                const selected = tags.includes(t);
+                return (
+                  <button
+                    type="button"
+                    key={t}
+                    className="nav-link"
+                    aria-pressed={selected}
+                    onClick={() =>
+                      setTags((prev) =>
+                        prev.includes(t)
+                          ? prev.filter((x) => x !== t)
+                          : [...prev, t],
+                      )
+                    }
+                    style={{ cursor: "pointer" }}
+                  >
+                    {selected ? "✓ " : ""}
+                    {t}
+                  </button>
+                );
+              })}
+
+              {/* 自定义标签，追加在尾部，每个内部带一个叉号 */}
+              {customTags.map((t) => {
+                const selected = tags.includes(t);
+                return (
+                  <button
+                    type="button"
+                    key={t}
+                    className="nav-link"
+                    aria-pressed={selected}
+                    onClick={() =>
+                      setTags((prev) =>
+                        prev.includes(t)
+                          ? prev.filter((x) => x !== t)
+                          : [...prev, t],
+                      )
+                    }
+                    style={{
+                      cursor: "pointer",
+                      position: "relative",
+                      paddingRight: 22,
+                    }}
+                  >
+                    {selected ? "✓ " : ""}
+                    {t}
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setCustomTags((prev) =>
+                          prev.filter((x) => x !== t),
+                        );
+                        setTags((prev) =>
+                          prev.filter((x) => x !== t),
+                        );
+                      }}
+                      style={{
+                        position: "absolute",
+                        top: 2,
+                        right: 4,
+                        cursor: "pointer",
+                      }}
+                      aria-label="移除自定义标签"
+                    >
+                      ×
+                    </span>
+                  </button>
+                );
+              })}
+
+              {/* 新建自定义标签按钮 */}
               <button
                 type="button"
                 className="nav-link"
@@ -395,7 +470,19 @@ export default function NewPost() {
                   if (!t) return;
                   const v = t.trim();
                   if (!v) return;
-                  if (!tags.includes(v)) setTags((prev) => [...prev, v]);
+                  // 如果与预设标签重名，直接当预设标签使用
+                  if (preset.includes(v)) {
+                    setTags((prev) =>
+                      prev.includes(v) ? prev : [...prev, v],
+                    );
+                    return;
+                  }
+                  setCustomTags((prev) =>
+                    prev.includes(v) ? prev : [...prev, v],
+                  );
+                  setTags((prev) =>
+                    prev.includes(v) ? prev : [...prev, v],
+                  );
                 }}
                 style={{ cursor: "pointer" }}
               >
@@ -403,6 +490,7 @@ export default function NewPost() {
               </button>
             </div>
           </div>
+
           <textarea
             placeholder="摘要"
             value={excerpt}
@@ -416,8 +504,11 @@ export default function NewPost() {
               color: "var(--text)",
             }}
           />
+
           <label style={{ display: "grid", gap: 6 }}>
-            <span style={{ color: "var(--muted)" }}>定时发布时间（可选）</span>
+            <span style={{ color: "var(--muted)" }}>
+              定时发布时间（可选）
+            </span>
             <input
               type="datetime-local"
               value={scheduledAt}
@@ -457,6 +548,7 @@ export default function NewPost() {
               <div className="hint">已添加图片：{images.length}/3</div>
             )}
           </div>
+
           {!!images.length && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {images.map((img) => (
@@ -558,6 +650,7 @@ export default function NewPost() {
               color: "var(--text)",
             }}
           />
+
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button
               className="nav-link"
@@ -590,12 +683,10 @@ export default function NewPost() {
                   "确定要清空当前新建文章以及暂存内容吗？此操作不可恢复。",
                 );
                 if (!ok) return;
-                // 先收集需要清理的资源 URL
                 const urls = [
                   ...images.map((i) => i.url),
                   ...audios.map((a) => a.url),
                 ];
-                // 清空本地状态和暂存
                 setTitle("");
                 setContent("");
                 setExcerpt("");
@@ -629,3 +720,4 @@ export default function NewPost() {
     </Container>
   );
 }
+

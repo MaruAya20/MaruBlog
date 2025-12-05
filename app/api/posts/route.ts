@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getTagStyle } from "@/lib/tagStyle";
 import { canPostTodayDb, awardXpDb } from "@/lib/xpDb";
 
-// 列表文章：发现页 / 我的界面等统一使用数据库读取（PostgreSQL），JSON 仅作为备份
+// Posts list API: used by Discover / My posts pages
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const tag = searchParams.get("tag") || undefined;
@@ -16,8 +16,7 @@ export async function GET(req: NextRequest) {
   );
   const authorIdParam = searchParams.get("authorId");
   const authorId = authorIdParam ? Number(authorIdParam) : undefined;
-  const includeDraftParam =
-    searchParams.get("includeDraft") === "1";
+  const includeDraftParam = searchParams.get("includeDraft") === "1";
   const favorited = searchParams.get("favorited") === "1";
   const q = searchParams.get("q") || undefined;
 
@@ -136,11 +135,32 @@ export async function GET(req: NextRequest) {
   }
 
   const posts = postsRaw.map((p) => {
-    const imgs = Array.from(
+    // 从正文 Markdown 中提取前 3 张图片
+    const imgsRaw = Array.from(
       String(p.content || "").matchAll(/!\[[^\]]*]\(([^)]+)\)/g),
     )
       .slice(0, 3)
       .map((m) => m[1] as string);
+
+    // 兼容历史数据：
+    //  - 早期插入的是原图 /api/uploads/xxx.jpg
+    //  - 中途有一段时间插入的是缩略图 /api/uploads/thumbs/xxx.thumb.jpg
+    // 这里统一把 previewImages 规范成“完整图 URL”，并另外计算缩略图 URL
+    const imgs = imgsRaw.map((url) => {
+      if (!url.startsWith("/api/uploads/")) return url;
+      const rest = url.slice("/api/uploads/".length);
+      // 内容里已经是缩略图 /api/uploads/thumbs/xxx.thumb.jpg 时，换算成完整图
+      if (rest.startsWith("thumbs/")) {
+        const thumbRest = rest.slice("thumbs/".length); // "xxx.thumb.jpg"
+        const m = thumbRest.match(/^(.*)\.thumb(\.[a-z0-9]+)$/i);
+        if (m) {
+          // 还原为 /api/uploads/xxx.jpg
+          return `/api/uploads/${m[1]}${m[2]}`;
+        }
+      }
+      return url;
+    });
+
     const effectiveAt = p.scheduledAt ?? p.publishedAt;
 
     const tagsArray = (p.tags || []) as string[];
@@ -151,22 +171,20 @@ export async function GET(req: NextRequest) {
     for (const t of tagsArray) {
       const name = (t || "").trim();
       if (!name) continue;
-      tagStyles[name] =
-        tagStyleMap[name] || getTagStyle(name);
+      tagStyles[name] = tagStyleMap[name] || getTagStyle(name);
     }
 
-    const thumbs = imgs.map((url) => {
+    const thumbs = imgs.map((fullUrl) => {
       // 仅对本站 /api/uploads/ 生成缩略图 URL，其它外链保持原样
-      if (url.startsWith("/api/uploads/")) {
-        const rest = url.slice("/api/uploads/".length); // e.g. "abc.jpg"
-        if (rest.startsWith("thumbs/")) return url;
-        const lastDot = rest.lastIndexOf(".");
-        if (lastDot === -1) return url;
-        const base = rest.slice(0, lastDot); // "abc"
-        const ext = rest.slice(lastDot); // ".jpg"
-        return `/api/uploads/thumbs/${base}.thumb${ext}`;
-      }
-      return url;
+      if (!fullUrl.startsWith("/api/uploads/")) return fullUrl;
+      const rest = fullUrl.slice("/api/uploads/".length); // e.g. "abc.jpg"
+      // 如果已经是 thumbs/xxx.thumb.jpg，就直接视为缩略图
+      if (rest.startsWith("thumbs/")) return fullUrl;
+      const lastDot = rest.lastIndexOf(".");
+      if (lastDot === -1) return fullUrl;
+      const base = rest.slice(0, lastDot); // "abc"
+      const ext = rest.slice(lastDot); // ".jpg"
+      return `/api/uploads/thumbs/${base}.thumb${ext}`;
     });
 
     return {
@@ -209,7 +227,7 @@ export async function GET(req: NextRequest) {
   });
 }
 
-// 发文 / 草稿 / 定时发布：仅通过 Prisma 写入数据库
+// 发文 / 草稿 / 定时发布：仅通过 Prisma 写入数据
 export async function POST(req: NextRequest) {
   const sess = await getSession();
   const body = (await req.json().catch(() => ({}))) as {
@@ -239,8 +257,7 @@ export async function POST(req: NextRequest) {
   }
   if (
     !sess ||
-    (sess.uid !== Number(authorId) &&
-      sess.role !== "ADMIN")
+    (sess.uid !== Number(authorId) && sess.role !== "ADMIN")
   ) {
     return NextResponse.json(
       { error: "unauthorized" },
@@ -289,12 +306,10 @@ export async function POST(req: NextRequest) {
     .toLowerCase()
     .replace(/\s+/g, "-")
     .replace(/[^a-z0-9\u4e00-\u9fa5\-]/g, "");
-  const slugBase =
-    base && base.length > 0 ? base : `post-${Date.now()}`;
+  const slugBase = base && base.length > 0 ? base : `post-${Date.now()}`;
   let slug = slugBase;
   let i = 1;
-  // 确保 slug 在数据库中唯一
-  // （文章数量有限，这里的 while 查询成本可以接受）
+  // 确保 slug 在数据库中唯一（文章数量有限，这里 while 查询成本可以接受）
   // eslint-disable-next-line no-constant-condition
   while (true) {
     const existing = await prisma.post.findUnique({
@@ -306,12 +321,9 @@ export async function POST(req: NextRequest) {
   }
 
   const now = new Date();
-  const statusNorm =
-    status === "draft" ? "draft" : "published";
+  const statusNorm = status === "draft" ? "draft" : "published";
   const scheduledAtDate =
-    statusNorm === "draft" && schedIso
-      ? new Date(schedIso)
-      : null;
+    statusNorm === "draft" && schedIso ? new Date(schedIso) : null;
 
   const created = await prisma.post.create({
     data: {
@@ -335,8 +347,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const effectiveAt =
-    created.scheduledAt ?? created.publishedAt;
+  const effectiveAt = created.scheduledAt ?? created.publishedAt;
   const post = {
     slug: created.slug,
     title: created.title,
@@ -353,3 +364,4 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ post });
 }
+
