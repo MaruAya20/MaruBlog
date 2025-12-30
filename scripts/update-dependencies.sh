@@ -25,11 +25,15 @@ rm -f package-lock.json
 echo "安装新依赖..."
 npm install
 
-# 4. 构建应用
+# 4. 生成 Prisma 客户端
+echo "生成 Prisma 客户端..."
+npx prisma generate
+
+# 5. 构建应用
 echo "构建应用..."
 npm run build
 
-# 5. 启动应用
+# 6. 启动应用
 echo "启动应用..."
 if [ -f "pm2.config.js" ]; then
   pm2 start pm2.config.js
