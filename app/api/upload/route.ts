@@ -114,31 +114,64 @@ export async function POST(req: NextRequest) {
         .toString(36)
         .slice(2)}`;
 
-      filename = `${baseName}.jpg`;
-      thumbFilename = `${baseName}.thumb.jpg`;
+      // 检测是否为 GIF
+      const isGif = mime === 'image/gif' || lower.endsWith('.gif');
 
-      // Main image: max 1920x1920, JPEG quality ~80
-      const mainBuffer = await sharp(buffer, { failOnError: false })
-        .resize({
-          width: 1920,
-          height: 1920,
-          fit: "inside",
-          withoutEnlargement: true,
-        })
-        .jpeg({ quality: 80 })
-        .toBuffer();
+      if (isGif) {
+        // GIF 图片：保持 GIF 格式，防止动画丢失
+        filename = `${baseName}.gif`;
+        thumbFilename = `${baseName}.thumb.gif`;
 
-      // Thumbnail: 400x400 square, JPEG quality ~75
-      const thumbBuffer = await sharp(buffer, { failOnError: false })
-        .resize(400, 400, { fit: "cover" })
-        .jpeg({ quality: 75 })
-        .toBuffer();
+        // 主图：最大 1920x1920，保持 GIF 格式
+        const mainBuffer = await sharp(buffer, { failOnError: false })
+          .resize({
+            width: 1920,
+            height: 1920,
+            fit: "inside",
+            withoutEnlargement: true,
+          })
+          .gif()  // 保持 GIF 格式
+          .toBuffer();
 
-      fs.writeFileSync(path.join(UPLOAD_DIR, filename), mainBuffer);
-      fs.writeFileSync(path.join(THUMB_DIR, thumbFilename), thumbBuffer);
+        // 缩略图：400x400 方形，保持 GIF 格式
+        const thumbBuffer = await sharp(buffer, { failOnError: false })
+          .resize(400, 400, { fit: "cover" })
+          .gif()  // 保持 GIF 格式
+          .toBuffer();
 
-      storedSize = mainBuffer.length;
-      storedMime = "image/jpeg";
+        fs.writeFileSync(path.join(UPLOAD_DIR, filename), mainBuffer);
+        fs.writeFileSync(path.join(THUMB_DIR, thumbFilename), thumbBuffer);
+
+        storedSize = mainBuffer.length;
+        storedMime = "image/gif";
+      } else {
+        // 非 GIF 图片：转换为 JPEG 格式
+        filename = `${baseName}.jpg`;
+        thumbFilename = `${baseName}.thumb.jpg`;
+
+        // Main image: max 1920x1920, JPEG quality ~80
+        const mainBuffer = await sharp(buffer, { failOnError: false })
+          .resize({
+            width: 1920,
+            height: 1920,
+            fit: "inside",
+            withoutEnlargement: true,
+          })
+          .jpeg({ quality: 80 })
+          .toBuffer();
+
+        // Thumbnail: 400x400 square, JPEG quality ~75
+        const thumbBuffer = await sharp(buffer, { failOnError: false })
+          .resize(400, 400, { fit: "cover" })
+          .jpeg({ quality: 75 })
+          .toBuffer();
+
+        fs.writeFileSync(path.join(UPLOAD_DIR, filename), mainBuffer);
+        fs.writeFileSync(path.join(THUMB_DIR, thumbFilename), thumbBuffer);
+
+        storedSize = mainBuffer.length;
+        storedMime = "image/jpeg";
+      }
     } else {
       // Non-image (audio): write as-is
       const extFromName = file.name.split(".").pop() || "";
