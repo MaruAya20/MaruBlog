@@ -118,31 +118,22 @@ export async function POST(req: NextRequest) {
       const isGif = mime === 'image/gif' || lower.endsWith('.gif');
 
       if (isGif) {
-        // GIF 图片：保持 GIF 格式，防止动画丢失
+        // GIF 图片：保持原始 GIF 格式，不进行任何处理，防止动画丢失
         filename = `${baseName}.gif`;
         thumbFilename = `${baseName}.thumb.gif`;
 
-        // 主图：最大 1920x1920，保持 GIF 格式
-        const mainBuffer = await sharp(buffer, { failOnError: false })
-          .resize({
-            width: 1920,
-            height: 1920,
-            fit: "inside",
-            withoutEnlargement: true,
-          })
-          .gif()  // 保持 GIF 格式
-          .toBuffer();
+        // 主图：直接保存原始 GIF 文件
+        fs.writeFileSync(path.join(UPLOAD_DIR, filename), buffer);
 
-        // 缩略图：400x400 方形，保持 GIF 格式
+        // 缩略图：对 GIF 生成缩略图（因为 GIF 可能很大，缩略图仍需处理）
         const thumbBuffer = await sharp(buffer, { failOnError: false })
           .resize(400, 400, { fit: "cover" })
-          .gif()  // 保持 GIF 格式
+          .gif()
           .toBuffer();
 
-        fs.writeFileSync(path.join(UPLOAD_DIR, filename), mainBuffer);
         fs.writeFileSync(path.join(THUMB_DIR, thumbFilename), thumbBuffer);
 
-        storedSize = mainBuffer.length;
+        storedSize = buffer.length;
         storedMime = "image/gif";
       } else {
         // 非 GIF 图片：转换为 JPEG 格式
