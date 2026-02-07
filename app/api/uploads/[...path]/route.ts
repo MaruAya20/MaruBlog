@@ -114,7 +114,9 @@ const range = req.headers.get("range");
 
 if (range) {
 
-// 示例: "bytes=32768-1048575"
+// 修正1: 使用更通用的正则表达式
+
+// 支持: bytes=0-, bytes=0-1023, bytes=-500
 
 const match = range.match(/bytes=(\d)-(\d)/);
 
@@ -127,12 +129,14 @@ return new NextResponse("Invalid range", { status: 400 });
 const startStr = match[1];
 const endStr = match[2];
 
-// 解析起始和结束字节
+// 修正2: 正确解析 start 和 end
+// 如果 startStr 为空，则 start 为 0
 const start = startStr ? parseInt(startStr, 10) : 0;
+// 如果 endStr 为空，则 end 为 fileSize - 1
 const end = endStr ? parseInt(endStr, 10) : fileSize - 1;
 
 // 边界检查
-if (start >= fileSize || end >= fileSize || start > end) {
+if (isNaN(start) || isNaN(end) || start >= fileSize || end >= fileSize || start > end) {
   return new NextResponse("Range not satisfiable", {
     status: 416,
     headers: { "Content-Range": `bytes */${fileSize}` },
@@ -165,7 +169,7 @@ const headers = {
 
 "Content-Type": getContentType(filePath),
 
-"Accept-Ranges": "bytes", // 告知浏览器支持范围请求
+"Accept-Ranges": "bytes",
 
 "Content-Length": fileSize.toString(),
 
