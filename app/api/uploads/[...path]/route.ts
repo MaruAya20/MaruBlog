@@ -76,6 +76,7 @@ const { path: segs } = await params;
 
 const rel = (segs || []).join("/");
 
+
 // 1. 基础安全校验
 
 if (!rel || rel.includes("..")) {
@@ -108,81 +109,56 @@ return new NextResponse("Not found", { status: 404 });
 
 const fileSize = stat.size;
 
-const range = req.headers.get("range");
+  const range = req.headers.get("range");
 
-// 2. 处理 Range 请求
+  // 处理 Range 请求（修正版）
+  if (range) {
+    const match = range.match(/bytes=(\d*)-(\d*)/);
+    if (!match) return new NextResponse("Invalid range", { status: 400 });
 
-if (range) {
+    const startStr = match[1] || "0";
+    const endStr = match[2] || String(fileSize - 1);
 
-// 修正1: 使用更通用的正则表达式
+    const start = parseInt(startStr, 10);
+    const end = parseInt(endStr, 10);
 
-// 支持: bytes=0-, bytes=0-1023, bytes=-500
+    if (
+      isNaN(start) || 
+      isNaN(end) || 
+      start >= fileSize || 
+      end >= fileSize || 
+      start > end
+    ) {
+      return new NextResponse("Range not satisfiable", {
+        status: 416,
+        headers: { "Content-Range": `bytes */${fileSize}` },
+      });
+    }
 
-const match = range.match(/bytes=(\d)-(\d)/);
+    const chunkSize = end - start + 1;
+    const stream = fs.createReadStream(filePath, { start, end });
 
-if (!match) {
+    return new NextResponse(stream as any, {
+      status: 206,
+      headers: {
+        "Content-Type": getContentType(filePath),
+        "Accept-Ranges": "bytes",
+        "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+        "Content-Length": chunkSize.toString(),
+        "Cache-Control": "public, max-age=0, must-revalidate",
+      },
+    });
+  }
 
-return new NextResponse("Invalid range", { status: 400 });
-
-}
-
-const startStr = match[1];
-const endStr = match[2];
-
-// 修正2: 正确解析 start 和 end
-// 如果 startStr 为空，则 start 为 0
-const start = startStr ? parseInt(startStr, 10) : 0;
-// 如果 endStr 为空，则 end 为 fileSize - 1
-const end = endStr ? parseInt(endStr, 10) : fileSize - 1;
-
-// 边界检查
-if (isNaN(start) || isNaN(end) || start >= fileSize || end >= fileSize || start > end) {
-  return new NextResponse("Range not satisfiable", {
-    status: 416,
-    headers: { "Content-Range": `bytes */${fileSize}` },
+  // 处理普通请求（无 Range 头）
+  const stream = fs.createReadStream(filePath);
+  return new NextResponse(stream as any, {
+    status: 200,
+    headers: {
+      "Content-Type": getContentType(filePath),
+      "Accept-Ranges": "bytes",
+      "Content-Length": fileSize.toString(),
+      "Cache-Control": "public, max-age=0, must-revalidate",
+    },
   });
-}
-
-const chunkSize = end - start + 1;
-const stream = fs.createReadStream(filePath, { start, end });
-
-const headers = {
-  "Content-Type": getContentType(filePath),
-  "Accept-Ranges": "bytes",
-  "Content-Range": `bytes ${start}-${end}/${fileSize}`,
-  "Content-Length": chunkSize.toString(),
-  "Cache-Control": "public, max-age=0, must-revalidate",
-};
-
-return new NextResponse(stream as any, {
-  status: 206, // 关键：返回 206 Partial Content
-  headers,
-});
-
-}
-
-// 3. 处理普通请求 (无 Range 头)
-
-const stream = fs.createReadStream(filePath);
-
-const headers = {
-
-"Content-Type": getContentType(filePath),
-
-"Accept-Ranges": "bytes",
-
-"Content-Length": fileSize.toString(),
-
-"Cache-Control": "public, max-age=0, must-revalidate",
-
-};
-
-return new NextResponse(stream as any, {
-
-status: 200,
-
-headers,
-
-});
-
 }
