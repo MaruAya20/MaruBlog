@@ -133,10 +133,11 @@ export default function MusicPlayer() {
               }}
               onError={(e) => {
                 // 如果封面图片加载失败，使用默认图标
-                (e.target as HTMLImageElement).style.display = 'none';
-                const parent = e.target.parentElement;
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                const parent = target.parentElement;
                 if (parent) {
-                  parent.innerHTML = '<span style="font-size: 24px; color: var(--brand);">♪</span>';
+                  parent.innerHTML = '<span style="font-size: 24px; color: var(--brand); display: flex; align-items: center; justify-content: center;">♪</span>';
                 }
               }}
             />
@@ -184,8 +185,9 @@ export default function MusicPlayer() {
                   }}
                   onError={(e) => {
                     // 如果封面图片加载失败，使用默认图标
-                    (e.target as HTMLImageElement).style.display = 'none';
-                    const parent = e.target.parentElement;
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const parent = target.parentElement;
                     if (parent) {
                       parent.innerHTML = '<span style="font-size: 18px; display: flex; align-items: center; justify-content: center; color: var(--brand);">♪</span>';
                     }
