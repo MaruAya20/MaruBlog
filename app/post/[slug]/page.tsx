@@ -23,6 +23,7 @@ import { getTagStyle } from "@/lib/tagStyle";
 import ViewTracker from "./ViewTracker";
 import PostContentWithAudioHandler from "@/app/components/PostContentWithAudioHandler";
 import PostThumbnailCard from "@/app/components/PostThumbnailCard";
+import PostContentWrapper from "@/app/components/PostContentWrapper";
 
 type PostLike = {
   slug: string;
@@ -508,7 +509,7 @@ export default async function PostPage({
             </div>
           )}
         </header>
-        <PostContentWithAudioHandler content={post.content} />
+        <PostContentWrapper content={post.content} />
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <LikeButton slug={post.slug} />
           <FavoriteButton slug={post.slug} />
