@@ -55,8 +55,10 @@ export default function MusicPlayer() {
   // 设置播放歌曲
   const playSong = (song: MusicInfo) => {
     setCurrentSong(song);
+    // 延迟播放，确保DOM更新完成
     setTimeout(() => {
       if (audioRef.current) {
+        audioRef.current.volume = volume;
         audioRef.current.play().catch(e => console.error("播放失败:", e));
         setIsPlaying(true);
       }
@@ -90,6 +92,8 @@ export default function MusicPlayer() {
             audioRef.current.volume = volume;
           }
         }}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
       />
       
       <div
@@ -275,8 +279,8 @@ export default function MusicPlayer() {
                 color: "var(--muted)",
                 marginTop: 4
               }}>
-                <span>0:{Math.floor((audioRef.current?.currentTime || 0) % 60).toString().padStart(2, '0')}</span>
-                <span>0:{Math.floor((audioRef.current?.duration || 0) % 60).toString().padStart(2, '0')}</span>
+                <span>{formatTime(audioRef.current?.currentTime || 0)}</span>
+                <span>{formatTime(audioRef.current?.duration || 0)}</span>
               </div>
             </div>
           )}
@@ -311,4 +315,11 @@ export default function MusicPlayer() {
       `}</style>
     </>
   );
+}
+
+// 时间格式化函数
+function formatTime(seconds: number) {
+  const min = Math.floor(seconds / 60);
+  const sec = Math.floor(seconds % 60);
+  return `${min}:${sec.toString().padStart(2, '0')}`;
 }

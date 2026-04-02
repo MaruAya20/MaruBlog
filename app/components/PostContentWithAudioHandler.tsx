@@ -68,29 +68,28 @@ export default function PostContentWithAudioHandler({ content }: Props) {
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       
-      // 检查是否点击了音频元素
-      if (target.tagName === 'AUDIO') {
-        const audio = target as HTMLAudioElement;
-        const src = audio.src || audio.getAttribute('src');
-        
-        if (src) {
-          // 获取音频文件名
-          const fileName = src.split('/').pop()?.split('?')[0] || '未知音频';
-          const cleanFileName = fileName.replace(/\.[^/.]+$/, ""); // 去掉扩展名
+      // 检查是否点击了音频卡片或其子元素
+      let audioCard: HTMLElement | null = null;
+      if (target.hasAttribute('data-audio') || target.closest('[data-audio]')) {
+        audioCard = target.hasAttribute('data-audio') 
+          ? target as HTMLElement 
+          : target.closest('[data-audio]') as HTMLElement;
+      }
+      
+      if (audioCard) {
+        const audioElement = audioCard.querySelector('audio');
+        if (audioElement) {
+          e.preventDefault();
+          const src = audioElement.src || audioElement.getAttribute('src');
           
-          // 提取音频元数据（如果有jsmediatags可用）
-          extractAudioMetadataFromUrl(src)
-            .then((metadata: any) => {
-              const cover = metadata?.picture ? convertToBase64Image(metadata.picture) : null;
-              const title = metadata?.title || cleanFileName || '未知音频';
-              const artist = metadata?.artist || '未知艺术家';
-              
-              playMusic(src, title, artist, cover || null);
-            })
-            .catch(() => {
-              // 如果无法提取元数据，使用默认值
-              playMusic(src, cleanFileName, '文章音频', null);
-            });
+          if (src) {
+            // 获取音频文件名
+            const fileName = src.split('/').pop()?.split('?')[0] || '未知音频';
+            const cleanFileName = fileName.replace(/\.[^/.]+$/, ""); // 去掉扩展名
+            
+            // 开始动画
+            triggerAnimationAndPlay(audioCard, src, cleanFileName);
+          }
         }
       }
     };
@@ -102,6 +101,90 @@ export default function PostContentWithAudioHandler({ content }: Props) {
       container.removeEventListener('click', handleClick);
     };
   }, []);
+
+  // 触发动画并将音频发送到全局播放器
+  const triggerAnimationAndPlay = async (audioCard: HTMLElement, src: string, cleanFileName: string) => {
+    // 查找音频名称元素
+    const audioTitleElement = audioCard.querySelector('div')?.firstChild?.textContent?.replace('🎵 ', '') || cleanFileName;
+    
+    // 创建临时图像元素用于动画
+    const tempImg = document.createElement('div');
+    tempImg.innerHTML = '♪'; // 使用音符符号作为默认图像
+    tempImg.style.position = 'fixed';
+    tempImg.style.zIndex = '9999';
+    tempImg.style.fontSize = '24px';
+    tempImg.style.width = '48px';
+    tempImg.style.height = '48px';
+    tempImg.style.display = 'flex';
+    tempImg.style.alignItems = 'center';
+    tempImg.style.justifyContent = 'center';
+    tempImg.style.background = '#fff';
+    tempImg.style.borderRadius = '8px';
+    tempImg.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+    tempImg.style.left = `${audioCard.getBoundingClientRect().left}px`;
+    tempImg.style.top = `${audioCard.getBoundingClientRect().top}px`;
+    tempImg.style.color = 'var(--brand)';
+    
+    // 尝试获取专辑封面
+    extractAudioMetadataFromUrl(src)
+      .then((metadata: any) => {
+        if (metadata?.picture) {
+          const cover = convertToBase64Image(metadata.picture);
+          if (cover) {
+            tempImg.innerHTML = '';
+            const img = document.createElement('img');
+            img.src = cover;
+            img.alt = '音频封面';
+            img.style.width = '100%';
+            img.style.height = '100%';
+            img.style.borderRadius = '8px';
+            img.style.objectFit = 'cover';
+            tempImg.appendChild(img);
+          }
+        }
+      })
+      .catch(() => {
+        // 如果无法获取封面，继续使用默认图标
+      })
+      .finally(() => {
+        document.body.appendChild(tempImg);
+        
+        // 获取目标位置（全局播放器位置）
+        const musicPlayer = document.querySelector('.music-player');
+        if (musicPlayer) {
+          const targetRect = musicPlayer.getBoundingClientRect();
+          
+          // 执行动画
+          tempImg.animate([
+            { 
+              transform: `translate(0, 0) scale(1)`,
+              opacity: 1
+            },
+            { 
+              transform: `translate(${targetRect.left - audioCard.getBoundingClientRect().left}px, ${targetRect.top - audioCard.getBoundingClientRect().top}px) scale(0.3)`,
+              opacity: 0.5
+            },
+            { 
+              transform: `translate(${targetRect.left - audioCard.getBoundingClientRect().left}px, ${targetRect.top - audioCard.getBoundingClientRect().top}px) scale(0)`,
+              opacity: 0
+            }
+          ], {
+            duration: 600,
+            easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)'
+          }).onfinish = () => {
+            document.body.removeChild(tempImg);
+            // 动画完成后播放音乐
+            playMusic(src, audioTitleElement, '文章音频', null);
+          };
+        } else {
+          // 如果找不到播放器，直接播放音乐
+          setTimeout(() => {
+            document.body.removeChild(tempImg);
+            playMusic(src, audioTitleElement, '文章音频', null);
+          }, 300);
+        }
+      });
+  };
 
   return (
     <div ref={containerRef}>
