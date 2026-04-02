@@ -1,3 +1,4 @@
+"use client";
 /**
  * 触发全局音乐播放事件
  * @param audioUrl 音频 URL
@@ -22,7 +23,6 @@ export function playMusic(
   });
   window.dispatchEvent(event);
 }
-"use client";
 import { useEffect, useRef, useState } from "react";
 import MarkdownToolbar from "../../components/MarkdownToolbar";
 import { useToast } from "../../components/ToastProvider";

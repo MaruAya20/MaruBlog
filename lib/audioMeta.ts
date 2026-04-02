@@ -5,7 +5,8 @@ export async function extractAudioMetadataFromUrl(audioUrl: string) {
   // 这个函数将在客户端使用jsmediatags来提取音频文件的元数据
   if (typeof window !== 'undefined') {
     try {
-      const jsmediatags = (await import('jsmediatags')).default;
+      // 动态导入jsmediatags库
+      const { default: jsmediatags } = await import('jsmediatags');
       
       return new Promise((resolve, reject) => {
         jsmediatags.read(audioUrl, {
