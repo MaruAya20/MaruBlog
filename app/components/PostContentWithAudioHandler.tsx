@@ -68,16 +68,16 @@ export default function PostContentWithAudioHandler({ content }: Props) {
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       
-      // 检查是否点击了音频卡片或其子元素
-      let audioCard: HTMLElement | null = null;
+      // 检查是否点击了旧的音频卡片或其子元素
+      let oldAudioCard: HTMLElement | null = null;
       if (target.hasAttribute('data-audio') || target.closest('[data-audio]')) {
-        audioCard = target.hasAttribute('data-audio') 
+        oldAudioCard = target.hasAttribute('data-audio') 
           ? target as HTMLElement 
           : target.closest('[data-audio]') as HTMLElement;
       }
       
-      if (audioCard) {
-        const audioElement = audioCard.querySelector('audio');
+      if (oldAudioCard) {
+        const audioElement = oldAudioCard.querySelector('audio');
         if (audioElement) {
           e.preventDefault();
           const src = audioElement.src || audioElement.getAttribute('src');
@@ -88,8 +88,29 @@ export default function PostContentWithAudioHandler({ content }: Props) {
             const cleanFileName = fileName.replace(/\.[^/.]+$/, ""); // 去掉扩展名
             
             // 开始动画
-            triggerAnimationAndPlay(audioCard, src, cleanFileName);
+            triggerAnimationAndPlay(oldAudioCard, src, cleanFileName);
           }
+        }
+      }
+      
+      // 检查是否点击了新的音频卡片
+      let newAudioCard: HTMLElement | null = null;
+      if (target.classList.contains('audio-card') || target.closest('.audio-card')) {
+        newAudioCard = target.classList.contains('audio-card') 
+          ? target as HTMLElement 
+          : target.closest('.audio-card') as HTMLElement;
+      }
+      
+      if (newAudioCard) {
+        e.preventDefault();
+        const audioUrl = newAudioCard.getAttribute('data-audio');
+        
+        if (audioUrl) {
+          const audioNameElement = newAudioCard.querySelector('div[style*="font-weight:500"]');
+          const audioName = audioNameElement?.textContent || '未知音频';
+          
+          // 开始动画
+          triggerAnimationAndPlay(newAudioCard, audioUrl, audioName);
         }
       }
     };
@@ -113,17 +134,17 @@ export default function PostContentWithAudioHandler({ content }: Props) {
     tempImg.style.position = 'fixed';
     tempImg.style.zIndex = '9999';
     tempImg.style.fontSize = '24px';
-    tempImg.style.width = '48px';
-    tempImg.style.height = '48px';
+    tempImg.style.width = '40px';
+    tempImg.style.height = '40px';
     tempImg.style.display = 'flex';
     tempImg.style.alignItems = 'center';
     tempImg.style.justifyContent = 'center';
-    tempImg.style.background = '#fff';
+    tempImg.style.background = 'linear-gradient(45deg, #667eea 0%, #764ba2 100%)';
     tempImg.style.borderRadius = '8px';
     tempImg.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
     tempImg.style.left = `${audioCard.getBoundingClientRect().left}px`;
     tempImg.style.top = `${audioCard.getBoundingClientRect().top}px`;
-    tempImg.style.color = 'var(--brand)';
+    tempImg.style.color = 'white';
     
     // 尝试获取专辑封面
     extractAudioMetadataFromUrl(src)

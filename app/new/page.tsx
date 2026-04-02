@@ -4,6 +4,7 @@ import Container from "../components/Container";
 import { useEffect, useRef, useState } from "react";
 import MarkdownToolbar from "../components/MarkdownToolbar";
 import { useToast } from "../components/ToastProvider";
+import { playMusic } from '../post/[slug]/Actions';
 
 type ImageItem = { url: string; name: string; snippet: string };
 type AudioItem = { url: string; name: string; snippet: string };
@@ -99,10 +100,112 @@ export default function NewPost() {
           }).catch(() => {});
         }
       } catch {
-        // 忽略清理失败
+        showToast("清理未使用资源失败", "error");
       }
     };
-  }, [images, audios]);
+  }, []);
+
+  async function handleImageFiles(files: FileList | null) {
+    if (!files) return;
+    if (images.length >= 3) {
+      showToast("最多只能添加 3 张图片", "info");
+      return;
+    }
+    const remaining = Math.max(0, 3 - images.length);
+    const picked = Array.from(files).slice(0, remaining);
+    for (const f of picked) {
+      if (f.size > 10 * 1024 * 1024) {
+        showToast(`${f.name} 超过 10MB，已跳过`, "error");
+        continue;
+      }
+      const fd = new FormData();
+      fd.append("file", f);
+      try {
+        const r = await fetch("/api/upload?kind=other", {
+          method: "POST",
+          body: fd,
+        });
+        const d = await r.json();
+        if (!r.ok || !d?.upload?.url) {
+          showToast(d?.error || "上传失败", "error");
+          continue;
+        }
+        const url = d.upload.url as string;
+        const snippet = `\n![图片](${url})\n`;
+        setContent((prev) => prev + snippet);
+        setImages((prev) =>
+          [...prev, { url, name: f.name, snippet }].slice(0, 3),
+        );
+      } catch {
+        showToast("上传失败", "error");
+      }
+    }
+  }
+
+  async function handleAudioFile(file: File | null) {
+    if (!file) return;
+    if (audios.length >= 2) {
+      showToast("最多只能添加 2 个音频", "info");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showToast(`${file.name} 超过 10MB，已跳过`, "error");
+      return;
+    }
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const r = await fetch("/api/upload?kind=other", {
+        method: "POST",
+        body: fd,
+      });
+      const d = await r.json();
+      if (!r.ok || !d?.upload?.url) {
+        showToast(d?.error || "上传失败", "error");
+        return;
+      }
+      const url = d.upload.url as string;
+      const safeName = file.name.replace(/[`\\]/g, "");
+      
+      // 修改音频卡片格式，使用新的全局播放器逻辑
+      const snippet = `\n<div className="audio-card" data-audio="${url}" style="margin:16px 0;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--card-bg);display:flex;align-items:center;gap:8px;cursor:pointer;" onclick="triggerGlobalPlay('${url}', '${safeName}')">\n  <div style="width:40px;height:40px;border-radius:8px;overflow:hidden;background:linear-gradient(45deg, #667eea 0%, #764ba2 100%);display:flex;align-items:center;justify-content:center;color:white;font-size:18px;">♪</div>\n  <div style="flex:1;min-width:0;">\n    <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${safeName}</div>\n  </div>\n  <button type="button" style="width:32px;height:32px;border:none;border-radius:50%;background:var(--brand);color:white;display:flex;align-items:center;justify-content:center;cursor:pointer;">▶</button>\n</div>\n<script>\nfunction triggerGlobalPlay(url, name) {\n  // 创建临时元素用于动画\n  const clickedEl = event.currentTarget;\n  const rect = clickedEl.getBoundingClientRect();\n  \n  const tempImg = document.createElement('div');\n  tempImg.innerHTML = '♪';\n  tempImg.style.position = 'fixed';\n  tempImg.style.zIndex = '9999';\n  tempImg.style.fontSize = '24px';\n  tempImg.style.width = '40px';\n  tempImg.style.height = '40px';\n  tempImg.style.display = 'flex';\n  tempImg.style.alignItems = 'center';\n  tempImg.style.justifyContent = 'center';\n  tempImg.style.background = 'linear-gradient(45deg, #667eea 0%, #764ba2 100%)';\n  tempImg.style.borderRadius = '8px';\n  tempImg.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';\n  tempImg.style.left = rect.left + 'px';\n  tempImg.style.top = rect.top + 'px';\n  tempImg.style.color = 'white';\n  \n  document.body.appendChild(tempImg);\n  \n  // 获取目标位置（全局播放器位置）\n  const musicPlayer = document.querySelector('.music-player');\n  if (musicPlayer) {\n    const targetRect = musicPlayer.getBoundingClientRect();\n    \n    tempImg.animate([\n      { \n        transform: \`translate(0, 0) scale(1)\`,\n        opacity: 1\n      },\n      { \n        transform: \`translate(\${targetRect.left - rect.left}px, \${targetRect.top - rect.top}px) scale(0.3)\`,\n        opacity: 0.5\n      },\n      { \n        transform: \`translate(\${targetRect.left - rect.left}px, \${targetRect.top - rect.top}px) scale(0)\`,\n        opacity: 0\n      }\n    ], {\n      duration: 600,\n      easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)'\n    }).onfinish = () => {\n      document.body.removeChild(tempImg);\n      // 动画完成后播放音乐\n      window.dispatchEvent(new CustomEvent('playMusic', {\n        detail: { url, title: name, artist: '文章音频', cover: null }\n      }));\n    };\n  } else {\n    // 如果找不到播放器，直接播放音乐\n    setTimeout(() => {\n      document.body.removeChild(tempImg);\n      window.dispatchEvent(new CustomEvent('playMusic', {\n        detail: { url, title: name, artist: '文章音频', cover: null }\n      }));\n    }, 300);\n  }\n}\n</script>`;
+      
+      setContent((prev) => prev + snippet);
+      setAudios((prev) =>
+        prev.length >= 2 ? prev : [...prev, { url, name: file.name, snippet }],
+      );
+    } catch {
+      showToast("上传失败", "error");
+    }
+  }
+
+  async function removeImage(item: ImageItem) {
+    setImages((prev) => prev.filter((x) => x.url !== item.url));
+    setContent((prev) => prev.replace(item.snippet, ""));
+    try {
+      await fetch("/api/upload/cleanup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ urls: [item.url] }),
+      });
+    } catch {
+      // ignore cleanup failures
+    }
+  }
+
+  async function removeAudio(item: AudioItem) {
+    setAudios((prev) => prev.filter((x) => x.url !== item.url));
+    setContent((prev) => prev.replace(item.snippet, ""));
+    try {
+      await fetch("/api/upload/cleanup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ urls: [item.url] }),
+      });
+    } catch {
+      // ignore cleanup failures
+    }
+  }
 
   function clearTemp() {
     if (!me) return;
@@ -176,195 +279,133 @@ export default function NewPost() {
 
   async function submit() {
     if (!me) {
-      setMsg("请先登录");
+      showToast("请先登录", "info");
       return;
     }
-    const res = await fetch("/api/posts", {
+    if (!title.trim()) {
+      showToast("请输入标题", "error");
+      return;
+    }
+    if (!content.trim()) {
+      showToast("请输入正文", "error");
+      return;
+    }
+
+    setMsg("发布中...");
+    const r = await fetch("/api/posts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        authorId: me.id,
         title,
         content,
         excerpt,
         tags,
+        status: "published",
+        scheduledAt: scheduledAt || undefined,
       }),
     });
-    const data = await res.json();
-    if (res.ok) {
+    if (r.ok) {
       clearTemp();
-      keepUploadsRef.current = true;
-      location.href = `/post/${encodeURIComponent(data.post.slug)}`;
+      location.href = "/";
     } else {
-      setMsg(data.error || "发布失败");
+      const d = await r.json();
+      setMsg(d.error || "发布失败");
     }
   }
 
   async function saveDraft() {
-    if (!me) {
-      setMsg("请先登录");
+    if (!title.trim() && !content.trim()) {
+      showToast("标题和正文不能同时为空", "error");
       return;
     }
-    setMsg("正在保存草稿...");
-    const res = await fetch("/api/posts", {
+
+    setMsg("保存中...");
+    const r = await fetch("/api/posts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        authorId: me.id,
         title,
         content,
         excerpt,
         tags,
         status: "draft",
+        scheduledAt: scheduledAt || undefined,
       }),
     });
-    const data = await res.json();
-    if (res.ok) {
-      clearTemp();
-      keepUploadsRef.current = true;
-      location.href = "/drafts";
+    if (r.ok) {
+      showToast("已保存草稿", "success");
     } else {
-      setMsg(data.error || "保存草稿失败");
+      const d = await r.json();
+      setMsg(d.error || "保存失败");
     }
   }
 
   async function scheduleDraft() {
-    if (!me) {
-      setMsg("请先登录");
+    if (!title.trim() && !content.trim()) {
+      showToast("标题和正文不能同时为空", "error");
       return;
     }
-    if (!scheduledAt) {
-      setMsg("请选择定时发布时间");
+    if (!(scheduledAt || "").trim()) {
+      showToast("请选择定时发布时间", "error");
       return;
     }
     const t = Date.parse(String(scheduledAt));
     if (!Number.isFinite(t) || t <= Date.now()) {
-      setMsg("定时发布时间必须在当前时间之后");
+      showToast("定时发布时间必须在当前时间之后", "error");
       return;
     }
-    setMsg("正在创建定时草稿...");
-    const iso = new Date(t).toISOString();
-    const res = await fetch("/api/posts", {
+
+    setMsg("设置定时发布中...");
+    const body = {
+      title,
+      content,
+      excerpt,
+      tags,
+      status: "draft",
+      scheduledAt: new Date(t).toISOString(),
+    };
+    const r = await fetch("/api/posts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        authorId: me.id,
-        title,
-        content,
-        excerpt,
-        tags,
-        status: "draft",
-        scheduledAt: iso,
-      }),
+      body: JSON.stringify(body),
     });
-    const data = await res.json();
-    if (res.ok) {
-      clearTemp();
-      keepUploadsRef.current = true;
-      location.href = "/drafts";
+    if (r.ok) {
+      showToast("已设置定时发布", "success");
     } else {
-      setMsg(data.error || "定时发布失败");
-    }
-  }
-
-  async function handleImageFiles(files: FileList | null) {
-    if (!files) return;
-    if (images.length >= 3) {
-      showToast("最多只能添加 3 张图片", "info");
-      return;
-    }
-    const remaining = Math.max(0, 3 - images.length);
-    const picked = Array.from(files).slice(0, remaining);
-    for (const f of picked) {
-      if (f.size > 10 * 1024 * 1024) {
-        showToast(`${f.name} 超过 10MB，已跳过`, "error");
-        continue;
-      }
-      const fd = new FormData();
-      fd.append("file", f);
-      try {
-        const r = await fetch("/api/upload?kind=other", {
-          method: "POST",
-          body: fd,
-        });
-        const d = await r.json();
-        if (!r.ok || !d?.upload?.url) {
-          showToast(d?.error || "上传失败", "error");
-          continue;
-        }
-        const url = d.upload.url as string;
-        const snippet = `\n![图片](${url})\n`;
-        setContent((prev) => prev + snippet);
-        setImages((prev) =>
-          [...prev, { url, name: f.name, snippet }].slice(0, 3),
-        );
-      } catch {
-        showToast("上传失败", "error");
-      }
-    }
-  }
-
-  async function handleAudioFile(file: File | null) {
-    if (!file) return;
-    if (audios.length >= 2) {
-      showToast("最多只能添加 2 个音频", "info");
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      showToast(`${file.name} 超过 10MB，已跳过`, "error");
-      return;
-    }
-    const fd = new FormData();
-    fd.append("file", file);
-    try {
-      const r = await fetch("/api/upload?kind=other", {
-        method: "POST",
-        body: fd,
-      });
       const d = await r.json();
-      if (!r.ok || !d?.upload?.url) {
-        showToast(d?.error || "上传失败", "error");
-        return;
+      setMsg(d.error || "设置失败");
+    }
+  }
+
+  // 在发布或保存草稿后，清理暂存的上传资源
+  useEffect(() => {
+    if (title && content) {
+      keepUploadsRef.current = true;
+      try {
+        const data = JSON.stringify({
+          title,
+          content,
+          tags,
+          excerpt,
+          scheduledAt,
+          images,
+          audios,
+        });
+        localStorage.setItem(getTempKey(me?.id), data);
+      } catch {
+        // ignore persist errors
       }
-      const url = d.upload.url as string;
-      const safeName = file.name.replace(/[`\\]/g, "");
-      const snippet = `\n<div className="card" data-audio>\n  <div>🎵 ${safeName}</div>\n  <audio controls src="${url}" preload="none" style={{width:'100%'}} />\n</div>\n`;
-      setContent((prev) => prev + snippet);
-      setAudios((prev) =>
-        prev.length >= 2 ? prev : [...prev, { url, name: file.name, snippet }],
-      );
-    } catch {
-      showToast("上传失败", "error");
     }
-  }
-
-  async function removeImage(item: ImageItem) {
-    setImages((prev) => prev.filter((x) => x.url !== item.url));
-    setContent((prev) => prev.replace(item.snippet, ""));
-    try {
-      await fetch("/api/upload/cleanup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ urls: [item.url] }),
-      });
-    } catch {
-      // ignore cleanup failures
-    }
-  }
-
-  async function removeAudio(item: AudioItem) {
-    setAudios((prev) => prev.filter((x) => x.url !== item.url));
-    setContent((prev) => prev.replace(item.snippet, ""));
-    try {
-      await fetch("/api/upload/cleanup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ urls: [item.url] }),
-      });
-    } catch {
-      // ignore cleanup failures
-    }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    title,
+    content,
+    tags,
+    excerpt,
+    scheduledAt,
+    JSON.stringify(images),
+    JSON.stringify(audios),
+  ]);
 
   return (
     <Container>
@@ -720,4 +761,3 @@ export default function NewPost() {
     </Container>
   );
 }
-
