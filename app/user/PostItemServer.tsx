@@ -1,7 +1,3 @@
-import { MDXRemote } from "next-mdx-remote/rsc";
-import remarkGfm from "remark-gfm";
-import rehypeSlug from "rehype-slug";
-import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import { getPostBySlug as getMdxPost } from "@/lib/posts";
 import { prisma } from "@/lib/prisma";
 import { formatYMDHM } from "@/lib/datetime";
@@ -11,7 +7,7 @@ import {
   Comments,
   OwnerActions,
 } from "../post/[slug]/Actions";
-import ArticleImageBinder from "@/app/components/ArticleImageBinder";
+import PostContentWithAudioHandler from "@/app/components/PostContentWithAudioHandler";
 import { getTagStyle } from "@/lib/tagStyle";
 
 type PostLike = {
@@ -160,23 +156,7 @@ export default async function PostItemServer({
           })}
         </div>
       </header>
-      <ArticleImageBinder>
-        <MDXRemote
-          source={post.content}
-          options={{
-            mdxOptions: {
-              remarkPlugins: [remarkGfm],
-              rehypePlugins: [
-                rehypeSlug,
-                [
-                  rehypeAutolinkHeadings,
-                  { behavior: "wrap" },
-                ],
-              ],
-            },
-          }}
-        />
-      </ArticleImageBinder>
+      <PostContentWithAudioHandler content={post.content} />
       <div
         style={{
           display: "flex",

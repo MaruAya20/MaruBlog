@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { MDXRemote, MDXRemoteProps } from 'next-mdx-remote/rsc';
 import { playMusic } from '@/app/post/[slug]/Actions';
+import ImageViewer from './ImageViewer';
 
 type Props = {
   content: string;
@@ -59,8 +60,132 @@ function convertToBase64Image(imageData: any) {
   return `data:${mimeType};base64,${btoa(base64String)}`;
 }
 
+// 将 Markdown 中的音频标记替换为可点击的音频卡片
+function renderAudioCards(content: string) {
+  // 替换 [audio:name](url) 格式的链接为音频卡片
+  return content.replace(/\[audio:([^\]]*)\]\(([^)]+)\)/g, (match, name, url) => {
+    return `
+<div class="audio-card" data-audio="${url}" style="margin:16px 0;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--card-bg);display:flex;align-items:center;gap:8px;cursor:pointer;">
+  <div style="width:40px;height:40px;border-radius:8px;overflow:hidden;background:linear-gradient(45deg, #667eea 0%, #764ba2 100%);display:flex;align-items:center;justify-content:center;color:white;font-size:18px;">♪</div>
+  <div style="flex:1;min-width:0;">
+    <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name}</div>
+  </div>
+  <button type="button" style="width:32px;height:32px;border:none;border-radius:50%;background:var(--brand);color:white;display:flex;align-items:center;justify-content:center;cursor:pointer;">▶</button>
+</div>
+`;
+  });
+}
+
 export default function PostContentWithAudioHandler({ content }: Props) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [src, setSrc] = useState("");
+  const [audioModalOpen, setAudioModalOpen] = useState(false);
+  const [currentAudio, setCurrentAudio] = useState<{ url: string; title: string } | null>(null);
+  
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // 图片预览功能
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    
+    const enableInlineFallback = true;
+    const onClick = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      
+      if (t.tagName === 'IMG') {
+        e.preventDefault();
+        e.stopPropagation();
+        const img = t as HTMLImageElement;
+        // 如果存在 data-full-src，则优先使用完整大图 URL，否则退回到当前 src
+        const s = img.getAttribute('data-full-src') || img.src;
+        if (s) {
+          setSrc(s);
+          setOpen(true);
+        }
+      }
+      
+      // 检查是否点击了旧的音频卡片或其子元素
+      let oldAudioCard: HTMLElement | null = null;
+      if (t.hasAttribute('data-audio') || t.closest('[data-audio]')) {
+        oldAudioCard = t.hasAttribute('data-audio') 
+          ? t as HTMLElement 
+          : t.closest('[data-audio]') as HTMLElement;
+      }
+      
+      if (oldAudioCard) {
+        const audioElement = oldAudioCard.querySelector('audio');
+        if (audioElement) {
+          e.preventDefault();
+          const src = audioElement.src || audioElement.getAttribute('src');
+          
+          if (src) {
+            // 获取音频文件名
+            const fileName = src.split('/').pop()?.split('?')[0] || '未知音频';
+            const cleanFileName = fileName.replace(/\.[^/.]+$/, ""); // 去掉扩展名
+            
+            // 开始动画
+            triggerAnimationAndPlay(oldAudioCard, src, cleanFileName);
+          }
+        }
+      }
+      
+      // 检查是否点击了新的音频卡片
+      let newAudioCard: HTMLElement | null = null;
+      if (t.classList.contains('audio-card') || t.closest('.audio-card')) {
+        newAudioCard = t.classList.contains('audio-card') 
+          ? t as HTMLElement 
+          : t.closest('.audio-card') as HTMLElement;
+      }
+      
+      if (newAudioCard) {
+        e.preventDefault();
+        const audioUrl = newAudioCard.getAttribute('data-audio');
+        
+        if (audioUrl) {
+          const audioNameElement = newAudioCard.querySelector('div[style*="font-weight:500"]');
+          const audioName = audioNameElement?.textContent || '未知音频';
+          
+          // 开始动画
+          triggerAnimationAndPlay(newAudioCard, audioUrl, audioName);
+        }
+      }
+    };
+
+    const onError = (e: Event) => {
+      if (!enableInlineFallback) return;
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      // 图片加载失败：用文本占位替代
+      if (t.tagName === 'IMG') {
+        const img = t as HTMLImageElement;
+        const placeholder = document.createElement('div');
+        placeholder.className = 'image-missing';
+        placeholder.textContent = '图片不见了！';
+        img.replaceWith(placeholder);
+        return;
+      }
+      // 音频加载失败：把整块卡片替换成"音频已下架！"
+      if (t.tagName === 'AUDIO') {
+        const audio = t as HTMLAudioElement;
+        const card = audio.closest('[data-audio]') as HTMLElement | null;
+        if (card) {
+          card.textContent = '音频已下架！';
+          card.setAttribute('data-audio-removed', '1');
+        }
+      }
+    };
+    
+    el.addEventListener('click', onClick, true);
+    el.addEventListener('error', onError, true);
+    
+    return () => {
+      el.removeEventListener('click', onClick, true);
+      el.removeEventListener('error', onError, true);
+    };
+  }, []);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -207,17 +332,23 @@ export default function PostContentWithAudioHandler({ content }: Props) {
       });
   };
 
+  // 渲染处理过的MDX内容
+  const processedContent = renderAudioCards(content);
+
   return (
-    <div ref={containerRef}>
-      <MDXRemote
-        source={content}
-        options={{
-          mdxOptions: {
-            remarkPlugins: [],
-            rehypePlugins: [],
-          },
-        }}
-      />
+    <div ref={wrapRef} className="article">
+      <div ref={containerRef}>
+        <MDXRemote
+          source={processedContent}
+          options={{
+            mdxOptions: {
+              remarkPlugins: [],
+              rehypePlugins: [],
+            },
+          }}
+        />
+      </div>
+      <ImageViewer open={open} src={src} onClose={() => setOpen(false)} />
     </div>
   );
 }

@@ -19,7 +19,6 @@ import {
   OwnerActions,
   playMusic,
 } from "./Actions";
-import ArticleImageBinder from "@/app/components/ArticleImageBinder";
 import PostThumbnailCard from "@/app/components/PostThumbnailCard";
 import { getLevelBadge } from "@/lib/userLevel";
 import { getTagStyle } from "@/lib/tagStyle";

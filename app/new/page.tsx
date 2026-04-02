@@ -167,8 +167,8 @@ export default function NewPost() {
       const url = d.upload.url as string;
       const safeName = file.name.replace(/[`\\]/g, "");
       
-      // 修改音频卡片格式，使用新的全局播放器逻辑
-      const snippet = `\n<div className="audio-card" data-audio="${url}" style="margin:16px 0;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--card-bg);display:flex;align-items:center;gap:8px;cursor:pointer;" onclick="triggerGlobalPlay('${url}', '${safeName}')">\n  <div style="width:40px;height:40px;border-radius:8px;overflow:hidden;background:linear-gradient(45deg, #667eea 0%, #764ba2 100%);display:flex;align-items:center;justify-content:center;color:white;font-size:18px;">♪</div>\n  <div style="flex:1;min-width:0;">\n    <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${safeName}</div>\n  </div>\n  <button type="button" style="width:32px;height:32px;border:none;border-radius:50%;background:var(--brand);color:white;display:flex;align-items:center;justify-content:center;cursor:pointer;">▶</button>\n</div>\n<script>\nfunction triggerGlobalPlay(url, name) {\n  // 创建临时元素用于动画\n  const clickedEl = event.currentTarget;\n  const rect = clickedEl.getBoundingClientRect();\n  \n  const tempImg = document.createElement('div');\n  tempImg.innerHTML = '♪';\n  tempImg.style.position = 'fixed';\n  tempImg.style.zIndex = '9999';\n  tempImg.style.fontSize = '24px';\n  tempImg.style.width = '40px';\n  tempImg.style.height = '40px';\n  tempImg.style.display = 'flex';\n  tempImg.style.alignItems = 'center';\n  tempImg.style.justifyContent = 'center';\n  tempImg.style.background = 'linear-gradient(45deg, #667eea 0%, #764ba2 100%)';\n  tempImg.style.borderRadius = '8px';\n  tempImg.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';\n  tempImg.style.left = rect.left + 'px';\n  tempImg.style.top = rect.top + 'px';\n  tempImg.style.color = 'white';\n  \n  document.body.appendChild(tempImg);\n  \n  // 获取目标位置（全局播放器位置）\n  const musicPlayer = document.querySelector('.music-player');\n  if (musicPlayer) {\n    const targetRect = musicPlayer.getBoundingClientRect();\n    \n    tempImg.animate([\n      { \n        transform: \`translate(0, 0) scale(1)\`,\n        opacity: 1\n      },\n      { \n        transform: \`translate(\${targetRect.left - rect.left}px, \${targetRect.top - rect.top}px) scale(0.3)\`,\n        opacity: 0.5\n      },\n      { \n        transform: \`translate(\${targetRect.left - rect.left}px, \${targetRect.top - rect.top}px) scale(0)\`,\n        opacity: 0\n      }\n    ], {\n      duration: 600,\n      easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)'\n    }).onfinish = () => {\n      document.body.removeChild(tempImg);\n      // 动画完成后播放音乐\n      window.dispatchEvent(new CustomEvent('playMusic', {\n        detail: { url, title: name, artist: '文章音频', cover: null }\n      }));\n    };\n  } else {\n    // 如果找不到播放器，直接播放音乐\n    setTimeout(() => {\n      document.body.removeChild(tempImg);\n      window.dispatchEvent(new CustomEvent('playMusic', {\n        detail: { url, title: name, artist: '文章音频', cover: null }\n      }));\n    }, 300);\n  }\n}\n</script>`;
+      // 创建简化的音频卡片HTML，但实际存储到Markdown中的只是一个引用
+      const snippet = `\n[audio:${safeName}](${url})\n`;
       
       setContent((prev) => prev + snippet);
       setAudios((prev) =>
@@ -300,6 +300,7 @@ export default function NewPost() {
         content,
         excerpt,
         tags,
+        authorId: me.id,  // 添加作者ID
         status: "published",
         scheduledAt: scheduledAt || undefined,
       }),
@@ -328,6 +329,7 @@ export default function NewPost() {
         content,
         excerpt,
         tags,
+        authorId: me?.id,  // 添加作者ID
         status: "draft",
         scheduledAt: scheduledAt || undefined,
       }),
@@ -361,6 +363,7 @@ export default function NewPost() {
       content,
       excerpt,
       tags,
+      authorId: me?.id,  // 添加作者ID
       status: "draft",
       scheduledAt: new Date(t).toISOString(),
     };
