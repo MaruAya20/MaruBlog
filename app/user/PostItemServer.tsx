@@ -1,3 +1,7 @@
+import { MDXRemote } from "next-mdx-remote/rsc";
+import remarkGfm from "remark-gfm";
+import rehypeSlug from "rehype-slug";
+import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import { getPostBySlug as getMdxPost } from "@/lib/posts";
 import { prisma } from "@/lib/prisma";
 import { formatYMDHM } from "@/lib/datetime";
@@ -7,7 +11,7 @@ import {
   Comments,
   OwnerActions,
 } from "../post/[slug]/Actions";
-import PostContentWithAudioHandler from "@/app/components/PostContentWithAudioHandler";
+import PostItemClientWrapper from "./PostItemClientWrapper";
 import { getTagStyle } from "@/lib/tagStyle";
 
 type PostLike = {
@@ -80,6 +84,7 @@ export default async function PostItemServer({
   if (!loaded) return null;
   const post = loaded.post;
 
+  // 为标签计算样式
   const tagStyles: Record<
     string,
     { bg: string; color: string; border: string }
@@ -156,7 +161,7 @@ export default async function PostItemServer({
           })}
         </div>
       </header>
-      <PostContentWithAudioHandler content={post.content} />
+      <PostItemClientWrapper post={post} />
       <div
         style={{
           display: "flex",
@@ -172,4 +177,3 @@ export default async function PostItemServer({
     </article>
   );
 }
-

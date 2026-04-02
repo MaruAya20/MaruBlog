@@ -7,6 +7,7 @@ import ImageViewer from './ImageViewer';
 
 type Props = {
   content: string;
+  children?: React.ReactNode;
 };
 
 // 从音频 URL 获取元数据（如封面图、艺术家、标题等）
@@ -76,7 +77,7 @@ function renderAudioCards(content: string) {
   });
 }
 
-export default function PostContentWithAudioHandler({ content }: Props) {
+export default function PostContentWithAudioHandler({ content, children }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [src, setSrc] = useState("");
@@ -337,16 +338,19 @@ export default function PostContentWithAudioHandler({ content }: Props) {
 
   return (
     <div ref={wrapRef} className="article">
+      {children}
       <div ref={containerRef}>
-        <MDXRemote
-          source={processedContent}
-          options={{
-            mdxOptions: {
-              remarkPlugins: [],
-              rehypePlugins: [],
-            },
-          }}
-        />
+        {content && (
+          <MDXRemote
+            source={processedContent}
+            options={{
+              mdxOptions: {
+                remarkPlugins: [],
+                rehypePlugins: [],
+              },
+            }}
+          />
+        )}
       </div>
       <ImageViewer open={open} src={src} onClose={() => setOpen(false)} />
     </div>

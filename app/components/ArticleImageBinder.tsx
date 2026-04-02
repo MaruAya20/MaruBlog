@@ -6,6 +6,7 @@ export default function ArticleImageBinder({ children, className = "article" }: 
   const wrapRef = React.useRef<HTMLDivElement>(null);
   const [open, setOpen] = React.useState(false);
   const [src, setSrc] = React.useState("");
+  
   React.useEffect(()=>{
     const el = wrapRef.current; if(!el) return;
     const enableInlineFallback =
@@ -34,7 +35,7 @@ export default function ArticleImageBinder({ children, className = "article" }: 
         img.replaceWith(placeholder);
         return;
       }
-      // 音频加载失败：把整块卡片替换成“音频已下架！”
+      // 音频加载失败：把整块卡片替换成"音频已下架！"
       if(t.tagName === 'AUDIO'){
         const audio = t as HTMLAudioElement;
         const card = audio.closest('[data-audio]') as HTMLElement | null;
@@ -51,6 +52,7 @@ export default function ArticleImageBinder({ children, className = "article" }: 
       el.removeEventListener('error', onError, true);
     };
   }, []);
+  
   return (
     <div ref={wrapRef} className={className}>
       {children}

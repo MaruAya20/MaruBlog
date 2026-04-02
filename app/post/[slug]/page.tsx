@@ -17,13 +17,12 @@ import {
   FavoriteButton,
   Comments,
   OwnerActions,
-  playMusic,
 } from "./Actions";
-import PostThumbnailCard from "@/app/components/PostThumbnailCard";
 import { getLevelBadge } from "@/lib/userLevel";
 import { getTagStyle } from "@/lib/tagStyle";
 import ViewTracker from "./ViewTracker";
 import PostContentWithAudioHandler from "@/app/components/PostContentWithAudioHandler";
+import PostThumbnailCard from "@/app/components/PostThumbnailCard";
 
 type PostLike = {
   slug: string;
