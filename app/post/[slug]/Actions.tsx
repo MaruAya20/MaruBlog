@@ -1,3 +1,27 @@
+/**
+ * 触发全局音乐播放事件
+ * @param audioUrl 音频 URL
+ * @param title 音频标题
+ * @param artist 艺术家
+ * @param cover 封面图片 URL
+ */
+export function playMusic(
+  audioUrl: string,
+  title: string = "未知音频",
+  artist: string = "未知艺术家",
+  cover: string | null = null
+) {
+  // 创建自定义事件并派发
+  const event = new CustomEvent('playMusic', {
+    detail: {
+      url: audioUrl,
+      title,
+      artist,
+      cover
+    }
+  });
+  window.dispatchEvent(event);
+}
 "use client";
 import { useEffect, useRef, useState } from "react";
 import MarkdownToolbar from "../../components/MarkdownToolbar";

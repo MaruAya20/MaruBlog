@@ -17,12 +17,14 @@ import {
   FavoriteButton,
   Comments,
   OwnerActions,
+  playMusic,
 } from "./Actions";
 import ArticleImageBinder from "@/app/components/ArticleImageBinder";
 import PostThumbnailCard from "@/app/components/PostThumbnailCard";
 import { getLevelBadge } from "@/lib/userLevel";
 import { getTagStyle } from "@/lib/tagStyle";
 import ViewTracker from "./ViewTracker";
+import PostContentWithAudioHandler from "@/app/components/PostContentWithAudioHandler";
 
 type PostLike = {
   slug: string;
@@ -234,7 +236,7 @@ async function getRelatedPostsLegacy(current: PostLike): Promise<any[]> {
   return related;
 }
 
-// 相关文章新实现：先尝试旧算法，如果没有结果，再用“最新文章”兜底，避免只看到默认/空状态
+// 相关文章新实现：先尝试旧算法，如果没有结果，再用"最新文章"兜底，避免只看到默认/空状态
 async function getRelatedPosts(current: PostLike): Promise<any[]> {
   const first = await getRelatedPostsLegacy(current);
   if (first && first.length > 0) return first;
@@ -508,20 +510,7 @@ export default async function PostPage({
             </div>
           )}
         </header>
-        <ArticleImageBinder>
-          <MDXRemote
-            source={post.content}
-            options={{
-              mdxOptions: {
-                remarkPlugins: [remarkGfm],
-                rehypePlugins: [
-                  rehypeSlug,
-                  [rehypeAutolinkHeadings, { behavior: "wrap" }],
-                ],
-              },
-            }}
-          />
-        </ArticleImageBinder>
+        <PostContentWithAudioHandler content={post.content} />
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <LikeButton slug={post.slug} />
           <FavoriteButton slug={post.slug} />

@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "./ToastProvider";
+import MusicPlayer from "./MusicPlayer"; // 引入音乐播放器
 
 type Me = {
   id: number;
@@ -124,49 +125,54 @@ export default function FloatingSidebar() {
   ];
 
   return (
-    <aside
-      aria-label="侧边导航"
-      style={{
-        position: "fixed",
-        left: 16,
-        bottom: 24,
-        zIndex: 40,
-        pointerEvents: visible ? "auto" : "none",
-        transform: visible
-          ? "translate(0,0)"
-          : "translate(-110%, 32px)",
-        opacity: visible ? 1 : 0,
-        transition:
-          "transform .35s ease-out, opacity .35s ease-out",
-      }}
-    >
-      <div
+    <>
+      <aside
+        aria-label="侧边导航"
         style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
+          position: "fixed",
+          left: 16,
+          bottom: 24,
+          zIndex: 40,
+          pointerEvents: visible ? "auto" : "none",
+          transform: visible
+            ? "translate(0,0)"
+            : "translate(-110%, 32px)",
+          opacity: visible ? 1 : 0,
+          transition:
+            "transform .35s ease-out, opacity .35s ease-out",
         }}
       >
-        {entries.map((e) => {
-          if (e.key === "new" && me && me.role === "GUEST") {
-            // 访客隐藏新建按钮，仅通过提示引导
-            return null;
-          }
-          const isActive = e.active;
-          return (
-            <NavItem
-              key={e.key}
-              label={e.label}
-              icon={e.icon}
-              isAvatar={e.isAvatar}
-              me={me}
-              active={isActive}
-              onClick={e.onClick}
-            />
-          );
-        })}
-      </div>
-    </aside>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+          }}
+        >
+          {entries.map((e) => {
+            if (e.key === "new" && me && me.role === "GUEST") {
+              // 访客隐藏新建按钮，仅通过提示引导
+              return null;
+            }
+            const isActive = e.active;
+            return (
+              <NavItem
+                key={e.key}
+                label={e.label}
+                icon={e.icon}
+                isAvatar={e.isAvatar}
+                me={me}
+                active={isActive}
+                onClick={e.onClick}
+              />
+            );
+          })}
+        </div>
+      </aside>
+      
+      {/* 添加音乐播放器组件 */}
+      <MusicPlayer />
+    </>
   );
 }
 
