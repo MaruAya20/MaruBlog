@@ -1,10 +1,6 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import { MDXRemote } from 'next-mdx-remote/rsc';
-import remarkGfm from 'remark-gfm';
-import rehypeSlug from 'rehype-slug';
-import rehypeAutolinkHeadings from 'rehype-autolink-headings';
 import { playMusic } from '@/app/post/[slug]/Actions';
 
 type Props = {
@@ -107,18 +103,7 @@ export default function PostContentWithAudioHandler({ content, children }: Props
   return (
     <div ref={wrapRef} className="article">
       {children}
-      <MDXRemote
-        source={processedContent}
-        options={{
-          mdxOptions: {
-            remarkPlugins: [remarkGfm],
-            rehypePlugins: [
-              rehypeSlug,
-              [rehypeAutolinkHeadings, { behavior: "wrap" }],
-            ],
-          },
-        }}
-      />
+      <div dangerouslySetInnerHTML={{ __html: processedContent }} />
     </div>
   );
 }
