@@ -5,7 +5,6 @@ import { formatYMDHM } from "@/lib/datetime";
 import ArticleImageBinder from "@/app/components/ArticleImageBinder";
 import { getLevelBadge } from "@/lib/userLevel";
 import { getTagStyle } from "@/lib/tagStyle";
-import PostContentWithAudioHandler from "@/app/components/PostContentWithAudioHandler";
 
 // 小卡片里的预览图：使用缩略图 URL 作为 src，同时把完整图 URL 放到 data-full-src，方便预览组件读取
 function PreviewImage({ thumb, full }: { thumb: string; full?: string }) {

@@ -145,7 +145,7 @@ export async function GET(req: NextRequest) {
     // 兼容历史数据：
     //  - 早期插入的是原图 /api/uploads/xxx.jpg
     //  - 中途有一段时间插入的是缩略图 /api/uploads/thumbs/xxx.thumb.jpg
-    // 这里统一把 previewImages 规范成“完整图 URL”，并另外计算缩略图 URL
+    // 这里统一把 previewImages 规范成"完整图 URL"，并另外计算缩略图 URL
     const imgs = imgsRaw.map((url) => {
       if (!url.startsWith("/api/uploads/")) return url;
       const rest = url.slice("/api/uploads/".length);
@@ -187,11 +187,12 @@ export async function GET(req: NextRequest) {
       return `/api/uploads/thumbs/${base}.thumb${ext}`;
     });
 
+    // 为列表页创建精简版本的响应数据，不包含完整内容
     return {
       slug: p.slug,
       title: p.title,
       excerpt: p.excerpt || undefined,
-      content: p.content,
+      // 注意：列表页不返回完整内容，以避免在列表中渲染完整内容
       tags: tagsArray,
       publishedAt: effectiveAt.toISOString(),
       date: effectiveAt.toISOString(),
@@ -364,4 +365,3 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ post });
 }
-
