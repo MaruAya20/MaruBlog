@@ -192,7 +192,7 @@ export async function GET(req: NextRequest) {
       slug: p.slug,
       title: p.title,
       excerpt: p.excerpt || undefined,
-      // 注意：列表页不返回完整内容，以避免在列表中渲染完整内容
+      // 列表页不返回完整内容，以避免在列表中渲染完整内容
       tags: tagsArray,
       publishedAt: effectiveAt.toISOString(),
       date: effectiveAt.toISOString(),
