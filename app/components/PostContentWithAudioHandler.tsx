@@ -1,9 +1,8 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { MDXRemote, MDXRemoteProps } from 'next-mdx-remote/rsc';
+import { MDXRemote } from 'next-mdx-remote/rsc';
 import { playMusic } from '@/app/post/[slug]/Actions';
-import ImageViewer from './ImageViewer';
 
 type Props = {
   content: string;
@@ -61,52 +60,97 @@ function convertToBase64Image(imageData: any) {
   return `data:${mimeType};base64,${btoa(base64String)}`;
 }
 
-// 将 Markdown 中的音频标记替换为可点击的音频卡片
+// 触发播放动画和实际播放
+function triggerAnimationAndPlay(
+  card: HTMLElement,
+  audioUrl: string,
+  audioName: string,
+) {
+  // 播放音乐
+  playMusic(audioUrl, audioName, '文章音频', null);
+}
+
+// 将 Markdown 中的音频 HTML 片段转换为带样式的音频卡片
 function renderAudioCards(content: string) {
-  // 替换 [audio:name](url) 格式的链接为音频卡片
-  return content.replace(/\[audio:([^\]]*)\]\(([^)]+)\)/g, (match, name, url) => {
-    return `
-<div class="audio-card" data-audio="${url}" style="margin:16px 0;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--card-bg);display:flex;align-items:center;gap:8px;cursor:pointer;">
-  <div style="width:40px;height:40px;border-radius:8px;overflow:hidden;background:linear-gradient(45deg, #667eea 0%, #764ba2 100%);display:flex;align-items:center;justify-content:center;color:white;font-size:18px;">♪</div>
-  <div style="flex:1;min-width:0;">
-    <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name}</div>
-  </div>
-  <button type="button" style="width:32px;height:32px;border:none;border-radius:50%;background:var(--brand);color:white;display:flex;align-items:center;justify-content:center;cursor:pointer;">▶</button>
-</div>
-`;
-  });
+  // 替换旧格式的音频标签
+  let processedContent = content.replace(
+    /<div[^>]*data-audio[^>]*>[\s\S]*?<audio[^>]*src="(.*?)"[^>]*><\/audio>[\s\S]*?<\/div>/g,
+    (match, audioSrc) => {
+      const titleMatch = match.match(/🎵 ([^<]+)/);
+      const title = titleMatch ? titleMatch[1] : '未知音频';
+      
+      return `
+      <div class="audio-card" data-audio="${audioSrc}" style="
+        padding: 16px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        margin: 12px 0;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      " 
+      onclick="event.preventDefault(); event.stopPropagation();">
+        <div style="
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          font-weight: 500;
+          color: var(--text);
+        ">
+          <svg viewBox="0 0 24 24" width="20" height="20" style="margin-right: 8px;">
+            <path fill="currentColor" d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+          </svg>
+          🎵 ${title}
+        </div>
+      </div>`;
+    },
+  );
+
+  // 替换新的音频链接格式 [audio:音频名称](音频URL)
+  processedContent = processedContent.replace(
+    /\[audio:([^\]]+)\]\(([^)]+)\)/g,
+    (match, title, audioSrc) => {
+      return `
+      <div class="audio-card" data-audio="${audioSrc}" style="
+        padding: 16px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        margin: 12px 0;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      "
+      onclick="event.preventDefault(); event.stopPropagation();">
+        <div style="
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          font-weight: 500;
+          color: var(--text);
+        ">
+          <svg viewBox="0 0 24 24" width="20" height="20" style="margin-right: 8px;">
+            <path fill="currentColor" d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+          </svg>
+          🎵 ${title}
+        </div>
+      </div>`;
+    },
+  );
+
+  return processedContent;
 }
 
 export default function PostContentWithAudioHandler({ content, children }: Props) {
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(false);
-  const [src, setSrc] = useState("");
-  const [audioModalOpen, setAudioModalOpen] = useState(false);
-  const [currentAudio, setCurrentAudio] = useState<{ url: string; title: string } | null>(null);
-  
-  const containerRef = useRef<HTMLDivElement>(null);
+  const wrapRef = React.useRef<HTMLDivElement>(null);
 
-  // 图片预览功能
+  // 音频处理功能
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
     
-    const enableInlineFallback = true;
     const onClick = (e: MouseEvent) => {
       const t = e.target as HTMLElement | null;
       if (!t) return;
-      
-      if (t.tagName === 'IMG') {
-        e.preventDefault();
-        e.stopPropagation();
-        const img = t as HTMLImageElement;
-        // 如果存在 data-full-src，则优先使用完整大图 URL，否则退回到当前 src
-        const s = img.getAttribute('data-full-src') || img.src;
-        if (s) {
-          setSrc(s);
-          setOpen(true);
-        }
-      }
       
       // 检查是否点击了旧的音频卡片或其子元素
       let oldAudioCard: HTMLElement | null = null;
@@ -117,19 +161,15 @@ export default function PostContentWithAudioHandler({ content, children }: Props
       }
       
       if (oldAudioCard) {
-        const audioElement = oldAudioCard.querySelector('audio');
-        if (audioElement) {
+        const audioUrl = oldAudioCard.getAttribute('data-audio');
+        
+        if (audioUrl) {
           e.preventDefault();
-          const src = audioElement.src || audioElement.getAttribute('src');
+          const audioNameElement = oldAudioCard.querySelector('div[style*="font-weight:500"]');
+          const audioName = audioNameElement?.textContent?.replace('🎵 ', '') || '未知音频';
           
-          if (src) {
-            // 获取音频文件名
-            const fileName = src.split('/').pop()?.split('?')[0] || '未知音频';
-            const cleanFileName = fileName.replace(/\.[^/.]+$/, ""); // 去掉扩展名
-            
-            // 开始动画
-            triggerAnimationAndPlay(oldAudioCard, src, cleanFileName);
-          }
+          // 开始动画
+          triggerAnimationAndPlay(oldAudioCard, audioUrl, audioName);
         }
       }
       
@@ -147,7 +187,7 @@ export default function PostContentWithAudioHandler({ content, children }: Props
         
         if (audioUrl) {
           const audioNameElement = newAudioCard.querySelector('div[style*="font-weight:500"]');
-          const audioName = audioNameElement?.textContent || '未知音频';
+          const audioName = audioNameElement?.textContent?.replace('🎵 ', '') || '未知音频';
           
           // 开始动画
           triggerAnimationAndPlay(newAudioCard, audioUrl, audioName);
@@ -155,183 +195,17 @@ export default function PostContentWithAudioHandler({ content, children }: Props
       }
     };
 
-    const onError = (e: Event) => {
-      if (!enableInlineFallback) return;
-      const t = e.target as HTMLElement | null;
-      if (!t) return;
-      // 图片加载失败：用文本占位替代
-      if (t.tagName === 'IMG') {
-        const img = t as HTMLImageElement;
-        const placeholder = document.createElement('div');
-        placeholder.className = 'image-missing';
-        placeholder.textContent = '图片不见了！';
-        img.replaceWith(placeholder);
-        return;
-      }
-      // 音频加载失败：把整块卡片替换成"音频已下架！"
-      if (t.tagName === 'AUDIO') {
-        const audio = t as HTMLAudioElement;
-        const card = audio.closest('[data-audio]') as HTMLElement | null;
-        if (card) {
-          card.textContent = '音频已下架！';
-          card.setAttribute('data-audio-removed', '1');
-        }
-      }
-    };
-    
-    el.addEventListener('click', onClick, true);
-    el.addEventListener('error', onError, true);
-    
-    return () => {
-      el.removeEventListener('click', onClick, true);
-      el.removeEventListener('error', onError, true);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    const handleClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      
-      // 检查是否点击了旧的音频卡片或其子元素
-      let oldAudioCard: HTMLElement | null = null;
-      if (target.hasAttribute('data-audio') || target.closest('[data-audio]')) {
-        oldAudioCard = target.hasAttribute('data-audio') 
-          ? target as HTMLElement 
-          : target.closest('[data-audio]') as HTMLElement;
-      }
-      
-      if (oldAudioCard) {
-        const audioElement = oldAudioCard.querySelector('audio');
-        if (audioElement) {
-          e.preventDefault();
-          const src = audioElement.src || audioElement.getAttribute('src');
-          
-          if (src) {
-            // 获取音频文件名
-            const fileName = src.split('/').pop()?.split('?')[0] || '未知音频';
-            const cleanFileName = fileName.replace(/\.[^/.]+$/, ""); // 去掉扩展名
-            
-            // 开始动画
-            triggerAnimationAndPlay(oldAudioCard, src, cleanFileName);
-          }
-        }
-      }
-      
-      // 检查是否点击了新的音频卡片
-      let newAudioCard: HTMLElement | null = null;
-      if (target.classList.contains('audio-card') || target.closest('.audio-card')) {
-        newAudioCard = target.classList.contains('audio-card') 
-          ? target as HTMLElement 
-          : target.closest('.audio-card') as HTMLElement;
-      }
-      
-      if (newAudioCard) {
-        e.preventDefault();
-        const audioUrl = newAudioCard.getAttribute('data-audio');
-        
-        if (audioUrl) {
-          const audioNameElement = newAudioCard.querySelector('div[style*="font-weight:500"]');
-          const audioName = audioNameElement?.textContent || '未知音频';
-          
-          // 开始动画
-          triggerAnimationAndPlay(newAudioCard, audioUrl, audioName);
-        }
-      }
-    };
-
-    const container = containerRef.current;
-    container.addEventListener('click', handleClick);
+    const container = wrapRef.current;
+    if (container) {
+      container.addEventListener('click', onClick);
+    }
 
     return () => {
-      container.removeEventListener('click', handleClick);
+      if (container) {
+        container.removeEventListener('click', onClick);
+      }
     };
   }, []);
-
-  // 触发动画并将音频发送到全局播放器
-  const triggerAnimationAndPlay = async (audioCard: HTMLElement, src: string, cleanFileName: string) => {
-    // 查找音频名称元素
-    const audioTitleElement = audioCard.querySelector('div')?.firstChild?.textContent?.replace('🎵 ', '') || cleanFileName;
-    
-    // 创建临时图像元素用于动画
-    const tempImg = document.createElement('div');
-    tempImg.innerHTML = '♪'; // 使用音符符号作为默认图像
-    tempImg.style.position = 'fixed';
-    tempImg.style.zIndex = '9999';
-    tempImg.style.fontSize = '24px';
-    tempImg.style.width = '40px';
-    tempImg.style.height = '40px';
-    tempImg.style.display = 'flex';
-    tempImg.style.alignItems = 'center';
-    tempImg.style.justifyContent = 'center';
-    tempImg.style.background = 'linear-gradient(45deg, #667eea 0%, #764ba2 100%)';
-    tempImg.style.borderRadius = '8px';
-    tempImg.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-    tempImg.style.left = `${audioCard.getBoundingClientRect().left}px`;
-    tempImg.style.top = `${audioCard.getBoundingClientRect().top}px`;
-    tempImg.style.color = 'white';
-    
-    // 尝试获取专辑封面
-    extractAudioMetadataFromUrl(src)
-      .then((metadata: any) => {
-        if (metadata?.picture) {
-          const cover = convertToBase64Image(metadata.picture);
-          if (cover) {
-            tempImg.innerHTML = '';
-            const img = document.createElement('img');
-            img.src = cover;
-            img.alt = '音频封面';
-            img.style.width = '100%';
-            img.style.height = '100%';
-            img.style.borderRadius = '8px';
-            img.style.objectFit = 'cover';
-            tempImg.appendChild(img);
-          }
-        }
-      })
-      .catch(() => {
-        // 如果无法获取封面，继续使用默认图标
-      })
-      .finally(() => {
-        document.body.appendChild(tempImg);
-        
-        // 获取目标位置（全局播放器位置）
-        const musicPlayer = document.querySelector('.music-player');
-        if (musicPlayer) {
-          const targetRect = musicPlayer.getBoundingClientRect();
-          
-          // 执行动画
-          tempImg.animate([
-            { 
-              transform: `translate(0, 0) scale(1)`,
-              opacity: 1
-            },
-            { 
-              transform: `translate(${targetRect.left - audioCard.getBoundingClientRect().left}px, ${targetRect.top - audioCard.getBoundingClientRect().top}px) scale(0.3)`,
-              opacity: 0.5
-            },
-            { 
-              transform: `translate(${targetRect.left - audioCard.getBoundingClientRect().left}px, ${targetRect.top - audioCard.getBoundingClientRect().top}px) scale(0)`,
-              opacity: 0
-            }
-          ], {
-            duration: 600,
-            easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)'
-          }).onfinish = () => {
-            document.body.removeChild(tempImg);
-            // 动画完成后播放音乐
-            playMusic(src, audioTitleElement, '文章音频', null);
-          };
-        } else {
-          // 如果找不到播放器，直接播放音乐
-          setTimeout(() => {
-            document.body.removeChild(tempImg);
-            playMusic(src, audioTitleElement, '文章音频', null);
-          }, 300);
-        }
-      });
-  };
 
   // 渲染处理过的MDX内容
   const processedContent = renderAudioCards(content);
@@ -339,20 +213,7 @@ export default function PostContentWithAudioHandler({ content, children }: Props
   return (
     <div ref={wrapRef} className="article">
       {children}
-      <div ref={containerRef}>
-        {content && (
-          <MDXRemote
-            source={processedContent}
-            options={{
-              mdxOptions: {
-                remarkPlugins: [],
-                rehypePlugins: [],
-              },
-            }}
-          />
-        )}
-      </div>
-      <ImageViewer open={open} src={src} onClose={() => setOpen(false)} />
+      <div dangerouslySetInnerHTML={{ __html: processedContent }} />
     </div>
   );
 }
