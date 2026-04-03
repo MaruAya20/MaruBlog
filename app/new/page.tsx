@@ -4,7 +4,6 @@ import Container from "../components/Container";
 import { useEffect, useRef, useState } from "react";
 import MarkdownToolbar from "../components/MarkdownToolbar";
 import { useToast } from "../components/ToastProvider";
-import { playMusic } from '../post/[slug]/Actions';
 
 type ImageItem = { url: string; name: string; snippet: string };
 type AudioItem = { url: string; name: string; snippet: string };
