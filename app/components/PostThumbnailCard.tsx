@@ -5,6 +5,7 @@ import { formatYMDHM } from "@/lib/datetime";
 import ArticleImageBinder from "@/app/components/ArticleImageBinder";
 import { getLevelBadge } from "@/lib/userLevel";
 import { getTagStyle } from "@/lib/tagStyle";
+import PostContentWithAudioHandler from "@/app/components/PostContentWithAudioHandler";
 
 // 小卡片里的预览图：使用缩略图 URL 作为 src，同时把完整图 URL 放到 data-full-src，方便预览组件读取
 function PreviewImage({ thumb, full }: { thumb: string; full?: string }) {
@@ -52,6 +53,8 @@ export default function PostThumbnailCard({
       // 移除HTML和Markdown标签，获取纯文本内容
       // 先去除Markdown链接语法，保留链接文本
       let plainText = p.content.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+      // 去除音频标签
+      plainText = plainText.replace(/\[audio:([^\]]+)\]\([^)]+\)/g, '');
       // 去除粗体、斜体等标记
       plainText = plainText.replace(/[*_]{1,3}([^*_]+)[*_]{1,3}/g, '$1');
       // 去除标题标记

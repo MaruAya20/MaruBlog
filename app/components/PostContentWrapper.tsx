@@ -1,10 +1,6 @@
 'use client';
 
 import React from 'react';
-import { MDXRemote } from 'next-mdx-remote/rsc';
-import remarkGfm from 'remark-gfm';
-import rehypeSlug from 'rehype-slug';
-import rehypeAutolinkHeadings from 'rehype-autolink-headings';
 import PostContentWithAudioHandler from '@/app/components/PostContentWithAudioHandler';
 
 interface PostContentWrapperProps {
