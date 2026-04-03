@@ -45,6 +45,31 @@ export default function PostThumbnailCard({
       ? (p as any).favorites
       : undefined;
 
+  // 生成摘要的函数：如果已经有摘要则直接使用，否则从内容中提取文本并截取前100个字符
+  const generateExcerpt = () => {
+    if (p.excerpt) return p.excerpt;
+    if (p.content) {
+      // 移除HTML和Markdown标签，获取纯文本内容
+      // 先去除Markdown链接语法，保留链接文本
+      let plainText = p.content.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+      // 去除粗体、斜体等标记
+      plainText = plainText.replace(/[*_]{1,3}([^*_]+)[*_]{1,3}/g, '$1');
+      // 去除标题标记
+      plainText = plainText.replace(/^#+\s+/gm, '');
+      // 去除引用标记
+      plainText = plainText.replace(/^\s*>+\s*/gm, '');
+      // 去除代码块标记
+      plainText = plainText.replace(/`{3}[\s\S]*?\n`{3}|`([^`]+)`/g, '$1');
+      // 去除其他HTML标签
+      plainText = plainText.replace(/<[^>]*>/g, '');
+      // 去除多余的空白字符
+      plainText = plainText.replace(/\s+/g, ' ').trim();
+      // 截取前100个字符作为摘要
+      return plainText.substring(0, 100) + (plainText.length > 100 ? '...' : '');
+    }
+    return "";
+  };
+
   return (
     <article
       key={p.slug}
@@ -167,7 +192,7 @@ export default function PostThumbnailCard({
       </div>
       <div
         className="excerpt"
-        title={p.excerpt || ""}
+        title={generateExcerpt()}
         style={{
           overflow: "hidden",
           display: "-webkit-box",
@@ -175,7 +200,7 @@ export default function PostThumbnailCard({
           WebkitBoxOrient: "vertical" as any,
         }}
       >
-        {p.excerpt}
+        {generateExcerpt()}
       </div>
       {(() => {
         const imgs: string[] = Array.isArray((p as any).previewImages)
