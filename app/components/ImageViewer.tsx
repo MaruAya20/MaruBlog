@@ -17,6 +17,7 @@ export default function ImageViewer({
   const [offset, setOffset] = React.useState({ x: 0, y: 0 });
   const dragging = React.useRef(false);
   const start = React.useRef({ x: 0, y: 0, ox: 0, oy: 0 });
+  const imgRef = React.useRef<HTMLImageElement>(null);
 
   React.useEffect(()=>{
     if(open){
@@ -33,9 +34,50 @@ export default function ImageViewer({
     }
   }, [open, onClose]);
 
-  React.useEffect(()=>{ if(open){ setScale(1); setOffset({x:0,y:0}); } }, [open, src]);
+  React.useEffect(()=>{ 
+    if(open){ 
+      setScale(1); 
+      setOffset({x:0,y:0}); 
+      
+      // 图片加载完成后计算合适的缩放比例
+      const timer = setTimeout(() => {
+        if (imgRef.current) {
+          const img = imgRef.current;
+          if (img.complete && img.naturalWidth > 0) {
+            calculateInitialScale(img);
+          } else {
+            img.onload = () => calculateInitialScale(img);
+          }
+        }
+      }, 10);
+      
+      return () => clearTimeout(timer);
+    } 
+  }, [open, src]);
 
-  if(!open) return null;
+  const calculateInitialScale = (img: HTMLImageElement) => {
+    if (!img.naturalWidth || !img.naturalHeight) return;
+    
+    // 获取容器尺寸（减去一些padding以确保完全显示）
+    const containerWidth = window.innerWidth * 0.95; // 95vw
+    const containerHeight = window.innerHeight * 0.90; // 90vh
+
+    // 计算宽高比
+    const imgRatio = img.naturalWidth / img.naturalHeight;
+    const containerRatio = containerWidth / containerHeight;
+
+    let newScale;
+    if (imgRatio > containerRatio) {
+      // 图片更宽，按宽度缩放
+      newScale = containerWidth / img.naturalWidth;
+    } else {
+      // 图片更高，按高度缩放
+      newScale = containerHeight / img.naturalHeight;
+    }
+
+    // 设置最小缩放比例，确保图像至少能贴合一侧
+    setScale(Math.max(newScale, 0.1)); // 最小不为0
+  };
 
   const clamp = (v:number, min:number, max:number)=> Math.max(min, Math.min(max, v));
   const wheel = (e: React.WheelEvent)=>{
@@ -90,6 +132,7 @@ export default function ImageViewer({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img 
+          ref={imgRef}
           src={src} 
           alt="查看图片" 
           style={{ 

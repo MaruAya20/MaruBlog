@@ -56,12 +56,7 @@ export default function ArticleImageBinder({ children, className = "article" }: 
   return (
     <div ref={wrapRef} className={className}>
       {children}
-      <ImageViewer open={open} src={src} onClose={()=>setOpen(false)} 
-        style={{ 
-          width: '90vw',  // 设置为视口宽度的90%
-          height: '80vh'  // 设置为视口高度的80%
-        }} 
-      />
+      <ImageViewer open={open} src={src} onClose={()=>setOpen(false)} />
     </div>
   );
 }

@@ -182,13 +182,7 @@ function parseContent(content: string) {
           src={imageUrl} 
           alt={altText}
           data-full-src={imageUrl}
-          style={{ 
-            maxWidth: '70%',     // 限制图片宽度为容器的70%
-            height: 'auto',      // 高度自适应
-            borderRadius: '8px', 
-            cursor: 'zoom-in', 
-            margin: '10px 0' 
-          }}
+          style={{ maxWidth: '100%', height: 'auto', borderRadius: '8px', cursor: 'zoom-in', margin: '10px 0' }}
         />
       );
 
