@@ -2,7 +2,17 @@
 import React from "react";
 import { createPortal } from "react-dom";
 
-export default function ImageViewer({ open, src, onClose }: { open: boolean; src: string; onClose: ()=>void }){
+export default function ImageViewer({ 
+  open, 
+  src, 
+  onClose,
+  style 
+}: { 
+  open: boolean; 
+  src: string; 
+  onClose: ()=>void;
+  style?: React.CSSProperties;
+}){
   const [scale, setScale] = React.useState(1);
   const [offset, setOffset] = React.useState({ x: 0, y: 0 });
   const dragging = React.useRef(false);
@@ -48,24 +58,18 @@ export default function ImageViewer({ open, src, onClose }: { open: boolean; src
   const calculateInitialScale = (img: HTMLImageElement) => {
     if (!img.naturalWidth || !img.naturalHeight) return;
     
-    // 获取容器尺寸（90vw x 90vh）
+    // 获取容器尺寸
     const containerWidth = window.innerWidth * 0.90;
     const containerHeight = window.innerHeight * 0.90;
 
-    // 计算宽高比
-    const imgRatio = img.naturalWidth / img.naturalHeight;
-    const containerRatio = containerWidth / containerHeight;
+    // 计算图片相对于容器的缩放比例
+    const scaleX = containerWidth / img.naturalWidth;
+    const scaleY = containerHeight / img.naturalHeight;
+    
+    // 选择较小的比例，确保图片完全适应容器
+    // 这样图片就会贴合较短的那一边（要么宽度贴合容器宽度，要么高度贴合容器高度）
+    const newScale = Math.min(scaleX, scaleY);
 
-    let newScale;
-    if (imgRatio > containerRatio) {
-      // 图片更宽，按宽度缩放，使图片宽度等于容器宽度的90%
-      newScale = containerWidth / img.naturalWidth;
-    } else {
-      // 图片更高，按高度缩放，使图片高度等于容器高度的90%
-      newScale = containerHeight / img.naturalHeight;
-    }
-
-    // 设置缩放，没有动画
     setScale(newScale);
   };
 
@@ -119,7 +123,10 @@ export default function ImageViewer({ open, src, onClose }: { open: boolean; src
           border: '1px solid var(--border)', 
           borderRadius: 8, 
           background: 'rgba(0,0,0,.25)', 
-          overflow: 'hidden'
+          overflow: 'hidden',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
         }} 
         onClick={(e)=>e.stopPropagation()} 
         onPointerDown={onDown} 
@@ -136,8 +143,8 @@ export default function ImageViewer({ open, src, onClose }: { open: boolean; src
             transformOrigin:'center center', 
             transition:'none', /* 无动画 */
             display:'block', 
-            maxWidth:'95vw', 
-            maxHeight:'90vh', 
+            maxWidth: '100%',
+            maxHeight: '100%',
             objectFit:'contain', 
             userSelect:'none', 
             pointerEvents:'none' 
