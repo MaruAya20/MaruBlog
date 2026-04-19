@@ -182,7 +182,7 @@ function parseContent(content: string) {
           src={imageUrl} 
           alt={altText}
           data-full-src={imageUrl}
-          style={{ maxWidth: '100%', height: 'auto', borderRadius: '8px', cursor: 'zoom-in', margin: '10px auto' }}
+          style={{ maxWidth: '70%', height: 'auto', borderRadius: '8px', cursor: 'zoom-in', margin: '10px auto' }}
         />
       );
 
