@@ -35,25 +35,43 @@ export default function ImageViewer({
   }, [open, onClose]);
 
   React.useEffect(()=>{ 
-    if(open){ 
+    if(open && src) { 
       setScale(1); 
       setOffset({x:0,y:0}); 
       
       // 图片加载完成后计算合适的缩放比例
       const timer = setTimeout(() => {
-        if (imgRef.current) {
+        if (imgRef.current && src) {
           const img = imgRef.current;
+          // 如果图片已经加载完成，直接计算缩放
           if (img.complete && img.naturalWidth > 0) {
             calculateInitialScale(img);
           } else {
-            img.onload = () => calculateInitialScale(img);
+            // 否则等待图片加载
+            img.onload = () => {
+              // 确保此时组件仍然处于打开状态且有有效的src
+              if (open && src) {
+                calculateInitialScale(img);
+              }
+            };
           }
         }
       }, 10);
       
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        // 清除之前可能设置的onload事件处理器
+        if (imgRef.current) {
+          imgRef.current.onload = null;
+        }
+      };
     } 
-  }, [open, src]);
+    // 当组件关闭时重置状态
+    else if (!open) {
+      setScale(1);
+      setOffset({x:0,y:0});
+    }
+  }, [open, src]); // 确保依赖项正确
 
   const calculateInitialScale = (img: HTMLImageElement) => {
     if (!img.naturalWidth || !img.naturalHeight) return;
@@ -88,6 +106,9 @@ export default function ImageViewer({
   const onDown = (e: React.PointerEvent)=>{ dragging.current=true; start.current={ x:e.clientX, y:e.clientY, ox: offset.x, oy: offset.y }; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); };
   const onMove = (e: React.PointerEvent)=>{ if(!dragging.current) return; const dx=e.clientX-start.current.x, dy=e.clientY-start.current.y; setOffset({ x: start.current.ox+dx, y: start.current.oy+dy }); };
   const onUp = (e: React.PointerEvent)=>{ dragging.current=false; try{ (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); }catch{} };
+
+  // 如果没有打开或者src为空，则不渲染任何内容
+  if (!open || !src) return null;
 
   const dialog = (
     <div
