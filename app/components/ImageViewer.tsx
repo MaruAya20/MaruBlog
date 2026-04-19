@@ -2,7 +2,17 @@
 import React from "react";
 import { createPortal } from "react-dom";
 
-export default function ImageViewer({ open, src, onClose }: { open: boolean; src: string; onClose: ()=>void }){
+export default function ImageViewer({ 
+  open, 
+  src, 
+  onClose,
+  style 
+}: { 
+  open: boolean; 
+  src: string; 
+  onClose: ()=>void;
+  style?: React.CSSProperties;
+}){
   const [scale, setScale] = React.useState(1);
   const [offset, setOffset] = React.useState({ x: 0, y: 0 });
   const dragging = React.useRef(false);
@@ -68,9 +78,32 @@ export default function ImageViewer({ open, src, onClose }: { open: boolean; src
           关闭
         </button>
       </div>
-      <div style={{maxWidth:'95vw', maxHeight:'90vh', border:'1px solid var(--border)', borderRadius:8, background:'rgba(0,0,0,.25)', overflow:'hidden'}} onClick={(e)=>e.stopPropagation()} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}>
+      <div 
+        style={{
+          ...{maxWidth:'95vw', maxHeight:'90vh', border:'1px solid var(--border)', borderRadius:8, background:'rgba(0,0,0,.25)', overflow:'hidden'},
+          ...style
+        }} 
+        onClick={(e)=>e.stopPropagation()} 
+        onPointerDown={onDown} 
+        onPointerMove={onMove} 
+        onPointerUp={onUp}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt="查看图片" style={{ transform:`translate(${offset.x}px, ${offset.y}px) scale(${scale})`, transformOrigin:'center center', transition:'transform 80ms ease', display:'block', maxWidth:'95vw', maxHeight:'90vh', objectFit:'contain', userSelect:'none', pointerEvents:'none' }} />
+        <img 
+          src={src} 
+          alt="查看图片" 
+          style={{ 
+            transform:`translate(${offset.x}px, ${offset.y}px) scale(${scale})`, 
+            transformOrigin:'center center', 
+            transition:'transform 80ms ease', 
+            display:'block', 
+            maxWidth:'95vw', 
+            maxHeight:'90vh', 
+            objectFit:'contain', 
+            userSelect:'none', 
+            pointerEvents:'none' 
+          }} 
+        />
       </div>
     </div>
   );
