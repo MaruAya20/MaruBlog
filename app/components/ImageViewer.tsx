@@ -2,22 +2,11 @@
 import React from "react";
 import { createPortal } from "react-dom";
 
-export default function ImageViewer({ 
-  open, 
-  src, 
-  onClose,
-  style 
-}: { 
-  open: boolean; 
-  src: string; 
-  onClose: ()=>void;
-  style?: React.CSSProperties;
-}){
+export default function ImageViewer({ open, src, onClose }: { open: boolean; src: string; onClose: ()=>void }){
   const [scale, setScale] = React.useState(1);
   const [offset, setOffset] = React.useState({ x: 0, y: 0 });
   const dragging = React.useRef(false);
   const start = React.useRef({ x: 0, y: 0, ox: 0, oy: 0 });
-  const imgRef = React.useRef<HTMLImageElement>(null);
 
   React.useEffect(()=>{
     if(open){
@@ -34,68 +23,9 @@ export default function ImageViewer({
     }
   }, [open, onClose]);
 
-  React.useEffect(()=>{ 
-    if(open && src) { 
-      setScale(1); 
-      setOffset({x:0,y:0}); 
-      
-      // 图片加载完成后计算合适的缩放比例
-      const timer = setTimeout(() => {
-        if (imgRef.current && src) {
-          const img = imgRef.current;
-          // 如果图片已经加载完成，直接计算缩放
-          if (img.complete && img.naturalWidth > 0) {
-            calculateInitialScale(img);
-          } else {
-            // 否则等待图片加载
-            img.onload = () => {
-              // 确保此时组件仍然处于打开状态且有有效的src
-              if (open && src) {
-                calculateInitialScale(img);
-              }
-            };
-          }
-        }
-      }, 10);
-      
-      return () => {
-        clearTimeout(timer);
-        // 清除之前可能设置的onload事件处理器
-        if (imgRef.current) {
-          imgRef.current.onload = null;
-        }
-      };
-    } 
-    // 当组件关闭时重置状态
-    else if (!open) {
-      setScale(1);
-      setOffset({x:0,y:0});
-    }
-  }, [open, src]); // 确保依赖项正确
+  React.useEffect(()=>{ if(open){ setScale(1); setOffset({x:0,y:0}); } }, [open, src]);
 
-  const calculateInitialScale = (img: HTMLImageElement) => {
-    if (!img.naturalWidth || !img.naturalHeight) return;
-    
-    // 获取容器尺寸（减去一些padding以确保完全显示）
-    const containerWidth = window.innerWidth * 0.95; // 95vw
-    const containerHeight = window.innerHeight * 0.90; // 90vh
-
-    // 计算宽高比
-    const imgRatio = img.naturalWidth / img.naturalHeight;
-    const containerRatio = containerWidth / containerHeight;
-
-    let newScale;
-    if (imgRatio > containerRatio) {
-      // 图片更宽，按宽度缩放
-      newScale = containerWidth / img.naturalWidth;
-    } else {
-      // 图片更高，按高度缩放
-      newScale = containerHeight / img.naturalHeight;
-    }
-
-    // 设置最小缩放比例，确保图像至少能贴合一侧
-    setScale(Math.max(newScale, 0.1)); // 最小不为0
-  };
+  if(!open) return null;
 
   const clamp = (v:number, min:number, max:number)=> Math.max(min, Math.min(max, v));
   const wheel = (e: React.WheelEvent)=>{
@@ -106,9 +36,6 @@ export default function ImageViewer({
   const onDown = (e: React.PointerEvent)=>{ dragging.current=true; start.current={ x:e.clientX, y:e.clientY, ox: offset.x, oy: offset.y }; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); };
   const onMove = (e: React.PointerEvent)=>{ if(!dragging.current) return; const dx=e.clientX-start.current.x, dy=e.clientY-start.current.y; setOffset({ x: start.current.ox+dx, y: start.current.oy+dy }); };
   const onUp = (e: React.PointerEvent)=>{ dragging.current=false; try{ (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); }catch{} };
-
-  // 如果没有打开或者src为空，则不渲染任何内容
-  if (!open || !src) return null;
 
   const dialog = (
     <div
@@ -141,33 +68,9 @@ export default function ImageViewer({
           关闭
         </button>
       </div>
-      <div 
-        style={{
-          ...{maxWidth:'95vw', maxHeight:'90vh', border:'1px solid var(--border)', borderRadius:8, background:'rgba(0,0,0,.25)', overflow:'hidden'},
-          ...style
-        }} 
-        onClick={(e)=>e.stopPropagation()} 
-        onPointerDown={onDown} 
-        onPointerMove={onMove} 
-        onPointerUp={onUp}
-      >
+      <div style={{maxWidth:'95vw', maxHeight:'90vh', border:'1px solid var(--border)', borderRadius:8, background:'rgba(0,0,0,.25)', overflow:'hidden'}} onClick={(e)=>e.stopPropagation()} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img 
-          ref={imgRef}
-          src={src} 
-          alt="查看图片" 
-          style={{ 
-            transform:`translate(${offset.x}px, ${offset.y}px) scale(${scale})`, 
-            transformOrigin:'center center', 
-            transition:'transform 80ms ease', 
-            display:'block', 
-            maxWidth:'95vw', 
-            maxHeight:'90vh', 
-            objectFit:'contain', 
-            userSelect:'none', 
-            pointerEvents:'none' 
-          }} 
-        />
+        <img src={src} alt="查看图片" style={{ transform:`translate(${offset.x}px, ${offset.y}px) scale(${scale})`, transformOrigin:'center center', transition:'transform 80ms ease', display:'block', maxWidth:'95vw', maxHeight:'90vh', objectFit:'contain', userSelect:'none', pointerEvents:'none' }} />
       </div>
     </div>
   );

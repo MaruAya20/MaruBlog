@@ -141,7 +141,7 @@ body::after{
 .article pre{ padding:12px; border-radius: 8px; background:#0c1220; overflow:auto; }
 .article code{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 .article img{
-  max-width: 100%;
+  max-width: 70%;
   height:auto;
   display:block;
   border-radius:12px;
