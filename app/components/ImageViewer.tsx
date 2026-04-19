@@ -7,6 +7,7 @@ export default function ImageViewer({ open, src, onClose }: { open: boolean; src
   const [offset, setOffset] = React.useState({ x: 0, y: 0 });
   const dragging = React.useRef(false);
   const start = React.useRef({ x: 0, y: 0, ox: 0, oy: 0 });
+  const imgRef = React.useRef<HTMLImageElement>(null);
 
   React.useEffect(()=>{
     if(open){
@@ -23,9 +24,50 @@ export default function ImageViewer({ open, src, onClose }: { open: boolean; src
     }
   }, [open, onClose]);
 
-  React.useEffect(()=>{ if(open){ setScale(1); setOffset({x:0,y:0}); } }, [open, src]);
+  React.useEffect(()=>{ 
+    if(open){ 
+      setScale(1); 
+      setOffset({x:0,y:0}); 
+      
+      // 图片加载完成后计算合适的缩放比例，让图片贴合一对水平边
+      const timer = setTimeout(() => {
+        if (imgRef.current) {
+          const img = imgRef.current;
+          if (img.complete && img.naturalWidth > 0) {
+            calculateInitialScale(img);
+          } else {
+            img.onload = () => calculateInitialScale(img);
+          }
+        }
+      }, 10);
+      
+      return () => clearTimeout(timer);
+    } 
+  }, [open, src]);
 
-  if(!open) return null;
+  const calculateInitialScale = (img: HTMLImageElement) => {
+    if (!img.naturalWidth || !img.naturalHeight) return;
+    
+    // 获取容器尺寸（90vw x 90vh）
+    const containerWidth = window.innerWidth * 0.90;
+    const containerHeight = window.innerHeight * 0.90;
+
+    // 计算宽高比
+    const imgRatio = img.naturalWidth / img.naturalHeight;
+    const containerRatio = containerWidth / containerHeight;
+
+    let newScale;
+    if (imgRatio > containerRatio) {
+      // 图片更宽，按宽度缩放，使图片宽度等于容器宽度的90%
+      newScale = containerWidth / img.naturalWidth;
+    } else {
+      // 图片更高，按高度缩放，使图片高度等于容器高度的90%
+      newScale = containerHeight / img.naturalHeight;
+    }
+
+    // 设置缩放，没有动画
+    setScale(newScale);
+  };
 
   const clamp = (v:number, min:number, max:number)=> Math.max(min, Math.min(max, v));
   const wheel = (e: React.WheelEvent)=>{
@@ -36,6 +78,8 @@ export default function ImageViewer({ open, src, onClose }: { open: boolean; src
   const onDown = (e: React.PointerEvent)=>{ dragging.current=true; start.current={ x:e.clientX, y:e.clientY, ox: offset.x, oy: offset.y }; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); };
   const onMove = (e: React.PointerEvent)=>{ if(!dragging.current) return; const dx=e.clientX-start.current.x, dy=e.clientY-start.current.y; setOffset({ x: start.current.ox+dx, y: start.current.oy+dy }); };
   const onUp = (e: React.PointerEvent)=>{ dragging.current=false; try{ (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); }catch{} };
+
+  if(!open) return null;
 
   const dialog = (
     <div
@@ -68,9 +112,37 @@ export default function ImageViewer({ open, src, onClose }: { open: boolean; src
           关闭
         </button>
       </div>
-      <div style={{maxWidth:'95vw', maxHeight:'90vh', border:'1px solid var(--border)', borderRadius:8, background:'rgba(0,0,0,.25)', overflow:'hidden'}} onClick={(e)=>e.stopPropagation()} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}>
+      <div 
+        style={{
+          width: '90vw', 
+          height: '90vh', 
+          border: '1px solid var(--border)', 
+          borderRadius: 8, 
+          background: 'rgba(0,0,0,.25)', 
+          overflow: 'hidden'
+        }} 
+        onClick={(e)=>e.stopPropagation()} 
+        onPointerDown={onDown} 
+        onPointerMove={onMove} 
+        onPointerUp={onUp}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt="查看图片" style={{ transform:`translate(${offset.x}px, ${offset.y}px) scale(${scale})`, transformOrigin:'center center', transition:'transform 80ms ease', display:'block', maxWidth:'95vw', maxHeight:'90vh', objectFit:'contain', userSelect:'none', pointerEvents:'none' }} />
+        <img 
+          ref={imgRef}
+          src={src} 
+          alt="查看图片" 
+          style={{ 
+            transform:`translate(${offset.x}px, ${offset.y}px) scale(${scale})`, 
+            transformOrigin:'center center', 
+            transition:'none', /* 无动画 */
+            display:'block', 
+            maxWidth:'95vw', 
+            maxHeight:'90vh', 
+            objectFit:'contain', 
+            userSelect:'none', 
+            pointerEvents:'none' 
+          }} 
+        />
       </div>
     </div>
   );
