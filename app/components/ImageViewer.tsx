@@ -38,40 +38,8 @@ export default function ImageViewer({
     if(open){ 
       setScale(1); 
       setOffset({x:0,y:0}); 
-      
-      // 图片加载完成后计算合适的缩放比例，让图片贴合一对水平边
-      const timer = setTimeout(() => {
-        if (imgRef.current) {
-          const img = imgRef.current;
-          if (img.complete && img.naturalWidth > 0) {
-            calculateInitialScale(img);
-          } else {
-            img.onload = () => calculateInitialScale(img);
-          }
-        }
-      }, 10);
-      
-      return () => clearTimeout(timer);
     } 
   }, [open, src]);
-
-  const calculateInitialScale = (img: HTMLImageElement) => {
-    if (!img.naturalWidth || !img.naturalHeight) return;
-    
-    // 获取容器尺寸
-    const containerWidth = window.innerWidth * 0.90;
-    const containerHeight = window.innerHeight * 0.90;
-
-    // 计算图片相对于容器的缩放比例
-    const scaleX = containerWidth / img.naturalWidth;
-    const scaleY = containerHeight / img.naturalHeight;
-    
-    // 选择较小的比例，确保图片完全适应容器
-    // 这样图片就会贴合较短的那一边（要么宽度贴合容器宽度，要么高度贴合容器高度）
-    const newScale = Math.min(scaleX, scaleY);
-
-    setScale(newScale);
-  };
 
   const clamp = (v:number, min:number, max:number)=> Math.max(min, Math.min(max, v));
   const wheel = (e: React.WheelEvent)=>{
